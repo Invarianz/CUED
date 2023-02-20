@@ -1,0 +1,19 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: regression test
+
+on:
+  push:
+    branches: [ master ]
+    
+jobs:
+  build:
+
+    runs-on: self-hosted
+    timeout-minutes: 1440
+    
+    steps:
+    - uses: actions/checkout@v2
+    - name: Run test script
+      run:  python3 tests/test_script.py --path tests --latex True --mpin 6
