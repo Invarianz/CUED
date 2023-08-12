@@ -18,9 +18,6 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11"]
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
-
     - name: Create Miniconda environment
       uses: conda-incubator/setup-miniconda@v2
       with:
