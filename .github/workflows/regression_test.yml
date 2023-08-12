@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  build:
     name: Regression test (${{ matrix.python-version }})
     runs-on: self-hosted
     timeout-minutes: 1440
@@ -21,12 +21,12 @@ jobs:
     steps:
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2.2.0
-      with:
-        auto-update-conda: true
-        auto-activate-base: false
-        python-version: ${{ matrix.python-version }}
-        channels: defaults,conda-forge
-        channel_priority: strict
-      - name: Conda info
-        shell: bash -el {0}
-        run: conda info
+#      with:
+#        auto-update-conda: true
+#        auto-activate-base: false
+#        python-version: ${{ matrix.python-version }}
+#        channels: defaults,conda-forge
+#        channel_priority: strict
+#      - name: Conda info
+#        shell: bash -el {0}
+#        run: conda info
