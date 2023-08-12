@@ -20,4 +20,3 @@ jobs:
     - run:  |
         export PYTHONPATH="$PWD"
         echo $PYTHONPATH
-        #python3 tests/test_script.py --path tests --latex True --mpin 6
