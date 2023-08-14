@@ -5,7 +5,7 @@ name: regression test
 
 on:
   push:
-    branches: [ master ]
+    branches: [ devel ]
   workflow_dispatch:
 
 jobs:
