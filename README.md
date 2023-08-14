@@ -1,8 +1,8 @@
 # <img alt="CUED" src="/cued/branding/logo_inverted.png#gh-dark-mode-only" height="100">
 # <img alt="CUED" src="/cued/branding/logo.png#gh-light-mode-only" height="100">
 
-![Test workflow](https://github.com/ccmt-regensburg/CUED/actions/workflows/regression_test.yml/badge.svg)
-![Test workflow for published calculations](https://github.com/ccmt-regensburg/CUED/actions/workflows/test_published_calculations.yml/badge.svg)
+![Test workflow](https://github.com/Invarianz/CUED/actions/workflows/regression_test.yml/badge.svg)
+![Test workflow for published calculations](https://github.com/Invarianz/CUED/actions/workflows/test_published_calculations.yml/badge.svg)
 
 Package for computing the density matrix dynamics in solids exposed to ultrafast light pulses implementing the Semiconductor Bloch equations (SBE). Includes computation of  k-dependent bandstructures and dipole moments, computation of currents and emission intensity. 
 
