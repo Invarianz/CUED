@@ -33,4 +33,4 @@ jobs:
     - name: Conda info
       run: conda info
     - name: Python test
-      run: python -c 'print("Hello World")'
+      run: echo $(which python)
