@@ -25,9 +25,12 @@ jobs:
       uses: conda-incubator/setup-miniconda@v2.2.0
       with:
         miniconda-version: latest
+        auto-activate-base: true
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
         channels: defaults,conda-forge
         channel-priority: strict
     - name: Conda info
       run: conda info
+    - name: Python test
+      run: python -c 'print("Hello World")'
