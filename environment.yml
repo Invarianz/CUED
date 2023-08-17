@@ -4,7 +4,6 @@ channels:
   - conda-forge
 
 dependencies:
-  - python >= 3.10
   - matplotlib >= 3.7.2
   - mpi4py >= 3.1.4
   - numba >= 0.57.1
