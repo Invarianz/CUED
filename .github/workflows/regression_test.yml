@@ -24,9 +24,10 @@ jobs:
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2.2.0
       with:
-        miniconda-version: latest
         auto-activate-base: true
         auto-update-conda: true
+        environment-file: environment.yml
+        miniconda-version: latest
         python-version: ${{ matrix.python-version }}
         channels: defaults,conda-forge
         channel-priority: strict
