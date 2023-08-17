@@ -33,5 +33,7 @@ jobs:
         channel-priority: strict
     - name: Conda info
       run: conda info
+    - name: Checkout latest repo version
+      uses: actions/checkout@v2
     - name: See which packages are missing
       run: python tests/test_script.py --path tests --latex True --mpin 6
