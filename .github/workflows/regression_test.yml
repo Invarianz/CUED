@@ -21,6 +21,8 @@ jobs:
       matrix:
         python-version: ["3.10", "3.11"]
     steps:
+    - name: Checkout latest repo version
+      uses: actions/checkout@v2
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2.2.0
       with:
@@ -33,7 +35,5 @@ jobs:
         channel-priority: strict
     - name: Conda info
       run: conda info
-    - name: Checkout latest repo version
-      uses: actions/checkout@v2
     - name: See which packages are missing
       run: python tests/test_script.py --path tests --latex True --mpin 6
