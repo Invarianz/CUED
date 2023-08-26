@@ -1,7 +1,7 @@
 import numpy as np
 import numpy.linalg as lin
-from cued.utility import ConversionFactors as co
-from cued.utility import conditional_njit, evaluate_njit_matrix
+from cued.utility.constants import ConversionFactors as co
+from cued.utility.njit import conditional_njit, evaluate_njit_matrix
 
 
 ##########################################################################################

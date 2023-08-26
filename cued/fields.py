@@ -1,5 +1,5 @@
 import numpy as np
-from cued.utility import conditional_njit
+from cued.utility.njit import conditional_njit
 
 def make_electric_field(P):
     """

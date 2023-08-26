@@ -1,5 +1,6 @@
 import matplotlib as mpl
-from cued.utility import cued_pwd
+
+from cued.utility.dir import cued_pwd
 
 symb = {'G': r'$\Gamma$',
         'K': r'$\mr{K}$',

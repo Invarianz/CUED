@@ -1,12 +1,12 @@
 from params import params
 
-import cued.hamiltonian
+from cued.hamiltonian.models
 from cued.main import sbe_solver
 
-def dirac():
+def model():
 	A = 0.1974      # Fermi velocity
 
-	dirac_system = cued.hamiltonian.BiTe(C0=0, C2=0, A=A, R=0, mz=0)
+	dirac_system = BiTe(C0=0, C2=0, A=A, R=0, mz=0)
 
 	return dirac_system
 def run(system):
@@ -16,4 +16,4 @@ def run(system):
 	return 0
 
 if __name__ == "__main__":
-	run(dirac())
+	run(model())

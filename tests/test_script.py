@@ -3,13 +3,12 @@ import glob
 import argparse
 import numpy as np
 import shutil
+import subprocess
 import importlib.util
-import importlib.machinery
 import sys
 
 from cued import HEADPATH
-from cued.plotting import read_dataset
-from cued.utility import ParamsParser
+from cued.plotting.read_data import read_dataset
 
 #########################################################################################################################################
 # THIS SCRIPT NEEDS TO BE EXECUTED IN THE MAIN GIT DIRECTORY BY CALLING python3 tests/test_script.py --path tests --latex True --mpin 2 #
@@ -220,7 +219,6 @@ def import_params(filename_params):
             current_mpi_num_procs = num_ranks
         else:
             current_mpi_num_procs = default_mpi_jobs
-    print(f"MG - Debug: Used {current_mpi_num_procs} ranks for {filename_params}")
     if hasattr(params, 'NUM_TESTED_ORDERS'):
         current_tested_orders = params.NUM_TESTED_ORDERS
     else:
@@ -264,11 +262,14 @@ def create_reference_data(testdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    os.system('mpirun -n ' + str(current_mpi_num_procs) + ' python -W ignore ' + testdir + '/runscript.py')
+    mpijob = ["mpirun", "-n", str(current_mpi_num_procs), "python", "-W",
+              "ignore", testdir + '/runscript.py']
+    result = subprocess.run(mpijob, check=True)
     for output_file in os.listdir(testdir):
-        if not output_file.startswith('reference_') and ( output_file.endswith('.dat') or
-                                                          output_file.endswith('.txt') ):
-            os.rename(testdir + '/' + output_file, testdir + '/' + 'reference_' + output_file)
+        if not output_file.startswith('reference_') and\
+           (output_file.endswith('.dat') or output_file.endswith('.txt')):
+            os.rename(testdir + '/' + output_file, testdir + '/' + 'reference_'
+                      + output_file)
     os.chdir(prev_dir)
     ##################################
 
@@ -282,7 +283,7 @@ def tester(testpath, test_type):
               '=====================================================')
     elif (test_type == 'reference'):
         print('=====================================================\n'
-              'Create all referece data in:\n' + testpath + '\n'
+              'Create all reference data in:\n' + testpath + '\n'
               '=====================================================')
     count = 0
 
@@ -318,6 +319,7 @@ def parser():
     parser.add_argument("-t", "--test_type", type=str, default="test",
                         help="Do 'test' or redo 'reference' files.")
     args = parser.parse_args()
+
 
     return args.path, args.latex, args.mpin, args.test_type
 

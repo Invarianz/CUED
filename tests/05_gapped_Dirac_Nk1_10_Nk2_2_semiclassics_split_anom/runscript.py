@@ -1,9 +1,9 @@
 from params import params
 
-import cued.hamiltonian
+from cued.hamiltonian.models import BiTe
 from cued.main import sbe_solver
 
-def dirac():
+def model():
 	A  = 0.1974      # Fermi velocity
 	mz = 0.01837     # prefactor of sigma_z in Hamiltonian
 
@@ -18,4 +18,4 @@ def run(system):
 	return 0
 
 if __name__ == "__main__":
-	run(dirac())
+	run(model())

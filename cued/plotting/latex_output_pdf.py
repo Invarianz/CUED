@@ -7,8 +7,10 @@ import shutil
 import tikzplotlib
 
 from cued.plotting.colormap import whitedarkjet
-from cued.plotting import contourf_remove_white_lines, label_inner, init_matplotlib_config, unit, symb
-from cued.utility import ConversionFactors as CoFa, rmdir_mkdir_chdir, cued_copy, chdir
+from cued.plotting.helpers import contourf_remove_white_lines, label_inner
+from cued.plotting.latex_settings_units import init_matplotlib_config, unit, symb
+from cued.utility.constants import ConversionFactors as CoFa
+from cued.utility.dir import rmdir_mkdir_chdir, cued_copy, chdir
 from cued.kpoint_mesh import hex_mesh, rect_mesh
 
 init_matplotlib_config()

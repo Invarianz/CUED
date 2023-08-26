@@ -2,8 +2,8 @@ import numpy as np
 from cued.fields import make_electric_field
 
 import cued.dipole
-from cued.utility import MpiHelpers
-from cued.utility import evaluate_njit_matrix
+from cued.utility.multicore import MpiHelpers
+from cued.utility.njit import evaluate_njit_matrix
 
 class TimeContainers():
 	def __init__(self, P):

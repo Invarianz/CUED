@@ -1,7 +1,7 @@
 import sympy as sp
 import numpy as np
 import matplotlib.pyplot as plt
-from cued.utility import evaluate_njit_matrix, matrix_to_njit_functions
+from cued.utility.njit import evaluate_njit_matrix, matrix_to_njit_functions
 
 plt.rcParams['figure.figsize'] = [150, 15]
 plt.rcParams['text.usetex'] = True

@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import itertools
 
-from cued.utility import ConversionFactors as CoFa
+from cued.utility.constants import ConversionFactors as CoFa
 
 class ParamsParser():
     """

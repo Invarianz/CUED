@@ -1,4 +1,4 @@
-Runtime: 29.7801275448873639 s 
+Runtime: 39.9544675180004560 s 
 
 BZ_type = rectangle
 E0 = 0.0009723451905
@@ -50,7 +50,7 @@ n = 2
 n_sheets = 1
 num_dimensions = automatic
 parallelize_over_points = None
-params_maximum = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+params_maximum = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
 path_parallelization = True
 phase = 0.0
 plot_format = pdf
@@ -66,7 +66,7 @@ sigma = 2067.0686674999997
 sigma_fs = 50.0
 solver = 2band
 solver_method = bdf
-split_current = False
+split_current = True
 symmetric_insulator = False
 t0 = -41341.373349999994
 t0_fs = -1000

@@ -6,13 +6,15 @@ import time
 from typing import OrderedDict
 from numba import njit
 
-from cued.utility import FrequencyContainers, TimeContainers, ScreeningContainers, ParamsParser
-from cued.utility import ConversionFactors as CoFa
-from cued.utility import MpiHelpers, rmdir_mkdir_chdir, chdir
-from cued.plotting import write_and_compile_latex_PDF, read_dataset
+from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
+from cued.utility.params_parser import ParamsParser
+from cued.utility.constants import ConversionFactors as CoFa
+from cued.utility.multicore import MpiHelpers
+from cued.utility.dir import rmdir_mkdir_chdir, chdir
+from cued.plotting.latex_output_pdf import write_and_compile_latex_PDF, write_and_compile_screening_latex_PDF
+from cued.plotting.read_data import read_dataset
 from cued.kpoint_mesh import hex_mesh, rect_mesh
 from cued.observables import *
-from cued.plotting import write_and_compile_screening_latex_PDF
 from cued.rhs_ode import *
 
 import sys as system
