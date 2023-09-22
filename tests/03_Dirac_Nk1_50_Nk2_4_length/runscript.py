@@ -1,6 +1,6 @@
 from params import params
 
-from cued.hamiltonian.models
+from cued.hamiltonian.models import BiTe
 from cued.main import sbe_solver
 
 def model():
