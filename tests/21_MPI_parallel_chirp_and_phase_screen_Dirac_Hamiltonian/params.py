@@ -1,9 +1,6 @@
 # Input parameters for SBE.py
 import numpy as np
 
-# Variable for test_script.py
-MPI_NUM_PROCS=8
-
 class params:
     # System parameters
     #########################################################################
@@ -43,4 +40,3 @@ class params:
     fourier_window_function = 'gaussian'
     user_out                = False
     save_latex_pdf      = False
-    
