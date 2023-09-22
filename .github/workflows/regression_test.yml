@@ -36,6 +36,6 @@ jobs:
     - name: Conda info
       run: conda info
     - name: Set CUED to PYTHONPATH
-      run: export PYTHONPATH="$PYTHONPATH:$(pwd)"
+      run: export PYTHONPATH="$PYTHONPATH:$PWD"
     - name: See which packages are missing
       run: python tests/test_script.py --path tests --latex True --mpin 6
