@@ -31,12 +31,11 @@ jobs:
         environment-file: environment.yml
         miniconda-version: latest
         python-version: ${{ matrix.python-version }}
-        channels: defaults,conda-forge
+        channels: conda-forge
         channel-priority: strict
     - name: Conda info
       run: conda info
     - name: See which packages are missing
       run: |
         export PYTHONPATH=$PWD
-        echo $PYTHONPATH
         python tests/test_script.py --path tests --latex True --mpin 6
