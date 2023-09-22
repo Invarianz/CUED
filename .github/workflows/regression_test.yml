@@ -35,7 +35,7 @@ jobs:
         channel-priority: strict
     - name: Conda info
       run: conda info
-    - name: See which packages are missing
+    - name: CUED Regression Tests
       run: |
         export PYTHONPATH=$PWD
-        python tests/test_script.py --path tests --latex True --mpin 4
+        python tests/test_script.py --path tests --latex True --mpin 8

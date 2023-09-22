@@ -4,8 +4,6 @@
 name: test of published calculations
 
 on:
-  push:
-    branches: [ devel ]
   workflow_dispatch:
 
 jobs:
@@ -35,7 +33,7 @@ jobs:
         channel-priority: strict
     - name: Conda info
       run: conda info
-    - name: See which packages are missing
+    - name: CUED Published Calculation Tests
       run: |
         export PYTHONPATH=$PWD
         python tests/test_script.py --path published_calculations --latex True --mpin 1
