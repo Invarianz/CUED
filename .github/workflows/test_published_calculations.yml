@@ -36,4 +36,4 @@ jobs:
     - name: CUED Published Calculation Tests
       run: |
         export PYTHONPATH=$PWD
-        python tests/test_script.py --path published_calculations --mpin 1
+        python tests/test_script.py --path published_calculations --mpin 8
