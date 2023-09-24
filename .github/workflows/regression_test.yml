@@ -38,4 +38,4 @@ jobs:
     - name: CUED Regression Tests
       run: |
         export PYTHONPATH=$PWD
-        python tests/test_script.py --path tests --latex True --mpin 8
+        python tests/test_script.py --path tests --mpin 8
