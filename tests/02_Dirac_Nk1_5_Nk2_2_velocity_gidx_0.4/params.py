@@ -42,11 +42,3 @@ class params:
     fourier_window_function = 'gaussian'
     split_current           = True
     user_out                = False
-    save_latex_pdf          = False
-    parallelize_over_points = True
-    parallelize_over_points = True
-    parallelize_over_points = True
-    parallelize_over_points = True
-    parallelize_over_points = True
-    parallelize_over_points = True
-    parallelize_over_points = True

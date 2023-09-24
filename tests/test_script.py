@@ -10,15 +10,10 @@ import sys
 from cued import HEADPATH
 from cued.plotting.read_data import read_dataset
 
-#########################################################################################################################################
-# THIS SCRIPT NEEDS TO BE EXECUTED IN THE MAIN GIT DIRECTORY BY CALLING python3 tests/test_script.py --path tests --latex True --mpin 2 #
-#########################################################################################################################################
-
 #################################
 # PARAMETERS OF THE TEST SCRIPT #
 #################################
 default_mpi_jobs = 1
-print_latex_pdf = False
 threshold_rel_error = 0.1
 threshold_wrong_points = 0.01
 default_tested_orders = 10
@@ -26,12 +21,12 @@ default_tested_orders = 10
 time_suffix = "time_data.dat"
 freq_suffix = "frequency_data.dat"
 params_suffix = "params.txt"
-pdf_suffix = "latex_pdf_files"
 
 def check_test(testdir, refdir):
 
     print('=====================================================\n'
-                'Start with test:\n' + testdir + '\n against reference in \n' + refdir)
+          'Start with test:\n{:s}\n against reference in \n{:s}'
+          .format(testdir, refdir))
 
     filename_params     = testdir + '/params.py'
     filename_run        = testdir + '/runscript.py'
@@ -42,17 +37,11 @@ def check_test(testdir, refdir):
     time_filenames = glob.glob1(refdir, "*" + time_suffix)
     refe_prefixes = [time_filename.replace(time_suffix, "") for time_filename in time_filenames]
     test_prefixes = [prefix.replace('reference_', '') for prefix in refe_prefixes]
-    pdf_foldernames = [prefix + pdf_suffix for prefix in test_prefixes]
 
     if hasattr(params,"gabor_transformation") and params.gabor_transformation == True:
         gabor_filenames = glob.glob1(refdir, "reference_gabor" + "*" + freq_suffix)
         gabor_refe_prefixes = [freq_filename.replace(freq_suffix, "") for freq_filename in gabor_filenames]
         gabor_test_prefixes = [prefix.replace('reference_', '') for prefix in gabor_refe_prefixes]
-
-    print_latex_pdf_really = check_params_for_print_latex_pdf(print_latex_pdf, params)
-
-    if print_latex_pdf_really:
-        os.system("echo '    save_latex_pdf = True' >> " + filename_params)
 
     assert os.path.isfile(filename_params),  'params.py is missing.'
     assert os.path.isfile(filename_run),     'runscript.py is missing.'
@@ -121,15 +110,6 @@ def check_test(testdir, refdir):
 
                 print("\nintra plus dtP E_dir: ", np.amax(np.abs(I_anom_ortho_ref)))
                 check_emission(I_anom_ortho, I_anom_ortho, I_anom_ortho_ref, I_anom_ortho_ref, 'anom')
-
-
-        if print_latex_pdf_really:
-            foldername_pdf = testdir + '/' + prefix + pdf_suffix + '/'
-            filename_pdf = foldername_pdf + 'CUED_summary.pdf'
-            assert os.path.isfile(filename_pdf),  "The latex PDF is not there."
-            os.system("sed -i '$ d' " + filename_params)
-            os.rename(filename_pdf, testdir + '/' + prefix + 'CUED_summary.pdf')
-            shutil.rmtree(foldername_pdf)
 
     if hasattr(params,"gabor_transformation") and params.gabor_transformation == True:
         # Reading in generated data from Gabor trafo
@@ -226,19 +206,6 @@ def import_params(filename_params):
 
     return params.params(), current_mpi_num_procs, current_tested_orders
 
-def check_params_for_print_latex_pdf(print_latex_pdf, params):
-
-    # print_latex_pdf is the global variable
-    if print_latex_pdf == True:
-        if hasattr(params, 'save_latex_pdf'):
-            print_latex_pdf_really = params.save_latex_pdf
-        else:
-            print_latex_pdf_really = print_latex_pdf
-    else:
-        print_latex_pdf_really = False
-
-    return print_latex_pdf_really
-
 def create_reference_data(testdir):
     print('=====================================================\n'
                 'Create reference data in:\n' + testdir + '\n'
@@ -248,11 +215,6 @@ def create_reference_data(testdir):
     filename_run        = testdir + '/runscript.py'
 
     params, current_mpi_num_procs, current_tested_orders = import_params(filename_params)
-
-    print_latex_pdf_really = check_params_for_print_latex_pdf(print_latex_pdf, params)
-
-    if print_latex_pdf_really:
-        os.system("echo '    save_latex_pdf = True' >> "+filename_params)
 
     assert os.path.isfile(filename_params),  'params.py is missing.'
     assert os.path.isfile(filename_run),     'runscript.py is missing.'
@@ -312,17 +274,14 @@ def parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--path", type=str, default='tests',
                         help="Relative testpath with respect to top level CUED dir.")
-    parser.add_argument("-l", "--latex", type=bool, default=True,
-                        help="Latex - PDF compilation.")
     parser.add_argument("-n", "--mpin", type=int, default=os.cpu_count()//2,
                         help="Number of mpi jobs")
     parser.add_argument("-t", "--test_type", type=str, default="test",
                         help="Do 'test' or redo 'reference' files.")
     args = parser.parse_args()
 
-
-    return args.path, args.latex, args.mpin, args.test_type
+    return args.path, args.mpin, args.test_type
 
 if __name__ == "__main__":
-    path, print_latex_pdf, default_mpi_jobs, test_type = parser()
+    path, default_mpi_jobs, test_type = parser()
     tester(path, test_type)
