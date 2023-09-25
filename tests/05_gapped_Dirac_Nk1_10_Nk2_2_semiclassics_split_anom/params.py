@@ -44,3 +44,4 @@ class params:
     dm_dynamics_method      = 'semiclassics'
     save_anom               = True
     user_out                = False
+    parallelize_over_points = True

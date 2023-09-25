@@ -1,8 +1,6 @@
 # Input parameters for SBE.py
 import numpy as np
 
-MPI_NUM_PROCS = 2
-
 class params:
     # System parameters
     #########################################################################
@@ -43,3 +41,4 @@ class params:
     gabor_transformation    = True
     gabor_gaussian_center   = np.linspace(-100, 100, num=4)
     gabor_window_width      = [10, 35]
+    parallelize_over_points = True

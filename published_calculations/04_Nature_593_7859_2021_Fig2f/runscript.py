@@ -3,7 +3,7 @@ from params import params
 
 from cued.hamiltonian.models import Semiconductor
 from cued.main import sbe_solver
-from cued.utility import ConversionFactors as co
+from cued.utility.constants import ConversionFactors as co
 
 def model():
     # Hamiltonian Parameters

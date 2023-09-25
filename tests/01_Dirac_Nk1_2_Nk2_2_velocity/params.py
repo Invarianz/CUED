@@ -1,8 +1,6 @@
 # Input parameters for SBE.py
 import numpy as np
 
-MPI_NUM_PROCS = 2
-
 class params:
     # System parameters
     #########################################################################
@@ -41,3 +39,4 @@ class params:
     fourier_window_function = 'gaussian'
     split_current           = True
     user_out                = False               # True to get user plotting and progress output
+    parallelize_over_points = True

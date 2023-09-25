@@ -186,19 +186,17 @@ def import_params(filename_params):
     spec = importlib.util.spec_from_file_location("params", filename_params)
     params = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(params)
-    if hasattr(params, 'MPI_NUM_PROCS'):
-        current_mpi_num_procs = params.MPI_NUM_PROCS
-    else:
-        if params.params().gauge == "velocity":
-            num_ranks = params.params().Nk1 * params.params().Nk2
-            os.system("echo '    parallelize_over_points = True' >> "+filename_params)
-        else:
-            num_ranks = params.params().Nk2
+    try:
+        params.params().parallelize_over_points
+        num_ranks = params.params().Nk1 * params.params().Nk2
+    except AttributeError:
+        # Means parallelize_over_points is not in params.
+        num_ranks = params.params().Nk2
 
-        if num_ranks < default_mpi_jobs:
-            current_mpi_num_procs = num_ranks
-        else:
-            current_mpi_num_procs = default_mpi_jobs
+    if num_ranks < default_mpi_jobs:
+        current_mpi_num_procs = num_ranks
+    else:
+        current_mpi_num_procs = default_mpi_jobs
     if hasattr(params, 'NUM_TESTED_ORDERS'):
         current_tested_orders = params.NUM_TESTED_ORDERS
     else:
