@@ -200,10 +200,10 @@ def import_params(filename_params):
             current_mpi_num_procs = num_ranks
         else:
             current_mpi_num_procs = default_mpi_jobs
-        if hasattr(params, 'NUM_TESTED_ORDERS'):
-            current_tested_orders = params.NUM_TESTED_ORDERS
-        else:
-            current_tested_orders = default_tested_orders
+    if hasattr(params, 'NUM_TESTED_ORDERS'):
+        current_tested_orders = params.NUM_TESTED_ORDERS
+    else:
+        current_tested_orders = default_tested_orders
 
     return params.params(), current_mpi_num_procs, current_tested_orders
 
