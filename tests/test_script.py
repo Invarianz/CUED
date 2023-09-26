@@ -28,8 +28,8 @@ def check_test(testdir, refdir):
           'Start with test:\n{:s}\n against reference in \n{:s}'
           .format(testdir, refdir))
 
-    filename_params     = testdir + '/params.py'
-    filename_run        = testdir + '/runscript.py'
+    filename_params     = os.path.join(testdir, 'params.py')
+    filename_run        = os.path.join(testdir, 'runscript.py')
 
     params, current_mpi_num_procs, current_tested_orders = import_params(filename_params)
 
@@ -72,7 +72,7 @@ def check_test(testdir, refdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    os.system('mpirun -n ' + str(current_mpi_num_procs) + ' python -W ignore ' + testdir + '/runscript.py')
+    os.system('mpirun -n ' + str(current_mpi_num_procs) + ' python -W ignore ' + os.path.join(testdir, 'runscript.py'))
     os.chdir(prev_dir)
     ##################################
 
@@ -80,9 +80,9 @@ def check_test(testdir, refdir):
     for i, prefix in enumerate(test_prefixes):
         time_data, freq_data, _dens_data = read_dataset(testdir, prefix=prefix, mute=True)
 
-        os.remove(testdir + '/' + prefix + params_suffix)
-        os.remove(testdir + '/' + prefix + freq_suffix)
-        os.remove(testdir + '/' + prefix + time_suffix)
+        os.remove(os.path.join(testdir, prefix + params_suffix))
+        os.remove(os.path.join(testdir, prefix + freq_suffix))
+        os.remove(os.path.join(testdir, prefix + time_suffix))
 
         assert time_data is not None, '"time_data.dat" was not generated from the code'
         assert freq_data is not None, '"frequency_data.dat" was not generated from the code'
@@ -116,16 +116,16 @@ def check_test(testdir, refdir):
         for i, prefix in enumerate(gabor_test_prefixes):
             _, gabor_freq_data, _ = read_dataset(testdir, prefix=prefix, mute=True)
 
-            os.remove(testdir + '/' + prefix + freq_suffix)
+            os.remove(os.path.join(testdir, prefix + freq_suffix))
 
             assert gabor_freq_data is not None, f'"{prefix}_frequency_data.dat" was not generated from the code'
 
             build_comparable_data(i, gabor_freq_data, gabor_freq_data_ref, current_tested_orders)
 
 
-    shutil.rmtree(testdir + '/__pycache__')
-    for E0_dirname   in glob.glob(testdir + '/E0*'):   shutil.rmtree(E0_dirname)
-    for PATH_dirname in glob.glob(testdir + '/PATH*'): shutil.rmtree(PATH_dirname)
+    shutil.rmtree(os.path.join(testdir, '__pycache__'))
+    for E0_dirname   in glob.glob(os.path.join(testdir, 'E0*')):   shutil.rmtree(E0_dirname)
+    for PATH_dirname in glob.glob(os.path.join(testdir, 'PATH*')): shutil.rmtree(PATH_dirname)
 
     print('Test passed successfully.'
           '\n\n=====================================================\n\n')
@@ -212,8 +212,8 @@ def create_reference_data(testdir):
                 'Create reference data in:\n' + testdir + '\n'
           '=====================================================\n')
 
-    filename_params     = testdir + '/params.py'
-    filename_run        = testdir + '/runscript.py'
+    filename_params     = os.path.join(testdir, 'params.py')
+    filename_run        = os.path.join(testdir, 'runscript.py')
 
     params, current_mpi_num_procs, current_tested_orders = import_params(filename_params)
 
@@ -226,19 +226,19 @@ def create_reference_data(testdir):
     prev_dir = os.getcwd()
     os.chdir(testdir)
     mpijob = ["mpirun", "-n", str(current_mpi_num_procs), "python", "-W",
-              "ignore", testdir + '/runscript.py']
+              "ignore", os.path.join(testdir, 'runscript.py')]
     result = subprocess.run(mpijob, check=True)
     for output_file in os.listdir(testdir):
         if not output_file.startswith('reference_') and\
            (output_file.endswith('.dat') or output_file.endswith('.txt')):
-            os.rename(testdir + '/' + output_file, testdir + '/' + 'reference_'
-                      + output_file)
+            os.rename(os.path.join(testdir, output_file), os.path.join(testdir, 'reference_'
+                      + output_file))
     os.chdir(prev_dir)
     ##################################
 
 def tester(testpath, test_type):
 
-    testpath = HEADPATH + '/' + testpath
+    testpath = os.path.join(HEADPATH, testpath)
     if (test_type == 'test'):
         print('=====================================================\n'
               'CUED CODE TESTER\n'
@@ -251,7 +251,7 @@ def tester(testpath, test_type):
     count = 0
 
     for cdir in sorted(os.listdir(testpath)):
-        testdir = testpath + '/' + cdir
+        testdir = os.path.join(testpath, cdir)
         if os.path.isdir(testdir) and not cdir.startswith('norun') and not cdir.startswith('crosstest', 3):
             count += 1
             if (test_type == 'test'):
@@ -261,7 +261,7 @@ def tester(testpath, test_type):
         if os.path.isdir(testdir) and cdir.startswith('crosstest', 3):
             for dummydir in sorted(os.listdir(testpath)):
                 if dummydir.startswith(cdir[-2:]):
-                    refdir = testpath + '/' + dummydir
+                    refdir = os.path.join(testpath, dummydir)
             if (test_type == 'test'):
                 try:
                     check_test(testdir, refdir)
