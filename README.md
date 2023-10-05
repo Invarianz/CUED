@@ -2,8 +2,9 @@
 # <img alt="CUED" src="/cued/branding/logo.png#gh-light-mode-only" height="100">
 
 | Test Type  | master | devel |
-| Regression |![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/regression.yml/badge.svg?=master) | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/regression.yml/badge.svg?branch=devel) |
-| Published  |![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/published.yml/badge.svg?=master) | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/published.yml/badge.svg?branch=devel) |
+| ---------- | ------ | ----- |
+| Regression | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/regression.yml/badge.svg?=master) | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/regression.yml/badge.svg?branch=devel) |
+| Published | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/published.yml/badge.svg?=master) | ![Test branch parameter](https://github.com/Invarianz/CUED/actions/workflows/published.yml/badge.svg?branch=devel) |
 
 
 
