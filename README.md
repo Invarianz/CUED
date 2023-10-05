@@ -1,6 +1,7 @@
 # <img alt="CUED" src="/cued/branding/logo_inverted.png#gh-dark-mode-only" height="100">
 # <img alt="CUED" src="/cued/branding/logo.png#gh-light-mode-only" height="100">
 
+![Test workflow](https://github.com/Invarianz/CUED/actions/workflows/regression_test.yml/badge.svg?=branch=devel)
 ![Test workflow](https://github.com/Invarianz/CUED/actions/workflows/regression_test.yml/badge.svg)
 ![Test workflow for published calculations](https://github.com/Invarianz/CUED/actions/workflows/test_published_calculations.yml/badge.svg)
 
