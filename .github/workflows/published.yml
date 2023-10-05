@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: Test of published calculations (${{ matrix.python-version }})
+    name: Published Calculations Test (${{ matrix.python-version }})
     runs-on: self-hosted
     timeout-minutes: 1440
     defaults:

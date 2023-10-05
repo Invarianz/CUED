@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    name: Regression test (${{ matrix.python-version }})
+    name: Regression Test (${{ matrix.python-version }})
     runs-on: self-hosted
     timeout-minutes: 1440
     defaults:
