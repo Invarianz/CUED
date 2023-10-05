@@ -23,6 +23,15 @@ jobs:
     steps:
     - name: Checkout latest repo version
       uses: actions/checkout@v2
+    - name: Cache Miniconda
+      uses: actions/cache@v2
+      env:
+        CACHE_NUMER: 0
+      with:
+        path: /temp_local/scratch/grp01587/conda_pkgs_dir
+        key:
+          ${{ runner.os }}-conda-${{ env.CACHE_NUMBER }} ${{
+          hashFiles('environment.yml') }}
     - name: Setup Miniconda
       uses: conda-incubator/setup-miniconda@v2.2.0
       with:
