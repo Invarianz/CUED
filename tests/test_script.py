@@ -38,7 +38,7 @@ def check_test(testdir, refdir):
     refe_prefixes = [time_filename.replace(time_suffix, "") for time_filename in time_filenames]
     test_prefixes = [prefix.replace('reference_', '') for prefix in refe_prefixes]
 
-    if hasattr(params,"gabor_transformation") and params.gabor_transformation == True:
+    if hasattr(params, "gabor_transformation") and params.gabor_transformation == True:
         gabor_filenames = glob.glob1(refdir, "reference_gabor" + "*" + freq_suffix)
         gabor_refe_prefixes = [freq_filename.replace(freq_suffix, "") for freq_filename in gabor_filenames]
         gabor_test_prefixes = [prefix.replace('reference_', '') for prefix in gabor_refe_prefixes]

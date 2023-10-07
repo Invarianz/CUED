@@ -29,9 +29,7 @@ class TwoBandHamiltonianSystem():
         ho, hx, hy, hz : Symbol
             Wheter to additionally return energy and wave function derivatives
         """
-        self.system = 'ana'
-
-        self.n = 2
+        self.bands = 2
 
         self.ho = ho
         self.hx = hx
@@ -183,11 +181,11 @@ class TwoBandHamiltonianSystem():
         kx_in_path = path[:, 0]
         ky_in_path = path[:, 1]
         pathlen = path[:,0].size
-        self.e_in_path = np.zeros([pathlen, P.n], dtype=P.type_real_np)
+        self.e_in_path = np.zeros([pathlen, P.bands], dtype=P.type_real_np)
 
         if P.dm_dynamics_method == 'semiclassics':
-            self.dipole_path_x = np.zeros([pathlen, P.n, P.n], dtype=P.type_complex_np)
-            self.dipole_path_y = np.zeros([pathlen, P.n, P.n], dtype=P.type_complex_np)
+            self.dipole_path_x = np.zeros([pathlen, P.bands, P.bands], dtype=P.type_complex_np)
+            self.dipole_path_y = np.zeros([pathlen, P.bands, P.bands], dtype=P.type_complex_np)
             self.Ax_path = evaluate_njit_matrix(self.Axfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
             self.Ay_path = evaluate_njit_matrix(self.Ayfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
             self.Bcurv = evaluate_njit_matrix(self.Bfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)

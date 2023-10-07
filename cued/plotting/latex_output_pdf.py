@@ -439,7 +439,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 		k_in_path[i_k] = k_in_path[i_k-1] + np.abs( abs_k[i_k] - abs_k[i_k-1] )
 
 	_fig, (ax1) = plt.subplots(1)
-	for i_band in range(P.n):
+	for i_band in range(P.bands):
 		_lines_exact_E_dir = ax1.plot(k_in_path, sys.e_in_path[:,i_band]*CoFa.au_to_eV, marker='', \
 		                              label="$n=$ "+str(i_band))
 	plot_it(P, r"Band energy " + unit['e(k)'], "bandstructure.tikz", ax1, k_in_path)
@@ -448,7 +448,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 	_fig, (ax2) = plt.subplots(1)
 	d_min = 1.0E-10
 	if P.dm_dynamics_method == 'semiclassics':
-		for i_band in range(P.n):
+		for i_band in range(P.bands):
 			abs_connection = (np.sqrt( np.abs(sys.Ax_path[:, i_band, i_band])**2 + \
 			                  np.abs(sys.Ay_path[:, i_band, i_band])**2 ) + 1.0e-80)*CoFa.au_to_as
 			_lines_exact_E_dir= ax2.semilogy(k_in_path, abs_connection, marker='', \
@@ -457,8 +457,8 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 		plot_it(P, r'Berry connection ' + unit['dn'], "abs_dipole.tikz", ax2, k_in_path, d_min)
 
 	else:
-		for i_band in range(P.n):
-			for j_band in range(P.n):
+		for i_band in range(P.bands):
+			for j_band in range(P.bands):
 				if j_band >= i_band: continue
 				abs_dipole = (np.sqrt(np.abs(sys.dipole_path_x[:, i_band, j_band])**2 + \
 				              np.abs(sys.dipole_path_y[:, i_band, j_band])**2) + 1.0e-80)*CoFa.au_to_as
@@ -472,7 +472,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 	_fig, (ax3) = plt.subplots(1)
 	d_min = 1.0E-10
 	if P.dm_dynamics_method == 'semiclassics':
-		for i_band in range(P.n):
+		for i_band in range(P.bands):
 			proj_connection = (np.abs( sys.Ax_path[:,i_band,i_band]*P.E_dir[0] + \
 			                   sys.Ay_path[:, i_band, i_band]*P.E_dir[1] ) + 1.0e-80)*CoFa.au_to_as
 			_lines_exact_E_dir = ax3.semilogy(k_in_path, proj_connection, marker='',
@@ -481,8 +481,8 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 		plot_it(P, unit['ephi_dot_dn'], "proj_dipole.tikz", ax3, k_in_path, d_min)
 
 	else:
-		for i_band in range(P.n):
-			for j_band in range(P.n):
+		for i_band in range(P.bands):
+			for j_band in range(P.bands):
 				if j_band >= i_band: continue
 				proj_dipole = (np.abs( sys.dipole_path_x[:,i_band,j_band]*P.E_dir[0] + \
 				               sys.dipole_path_y[:,i_band,j_band]*P.E_dir[1] ) + 1.0e-80)/CoFa.au_to_as
@@ -530,8 +530,8 @@ def dipole_quiver_plots(K, P, sys):
 
 	Nk_combined = P.Nk1*P.Nk2
 
-	d_x = np.zeros([Nk_combined, P.n, P.n], dtype=np.complex128)
-	d_y = np.zeros([Nk_combined, P.n, P.n], dtype=np.complex128)
+	d_x = np.zeros([Nk_combined, P.bands, P.bands], dtype=np.complex128)
+	d_y = np.zeros([Nk_combined, P.bands, P.bands], dtype=np.complex128)
 	k_x = np.zeros( Nk_combined )
 	k_y = np.zeros( Nk_combined )
 
@@ -549,12 +549,12 @@ def dipole_quiver_plots(K, P, sys):
 		k_x[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,0]/CoFa.au_to_as
 		k_y[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,1]/CoFa.au_to_as
 
-	num_plots = P.n**2
+	num_plots = P.bands**2
 	num_plots_vert = (num_plots+1)//2
 
 	fig, ax = plt.subplots(num_plots_vert, 2, figsize=(15, 6.2*num_plots_vert))
 
-	for i_band in range(P.n):
+	for i_band in range(P.bands):
 		plot_x_index = i_band//2
 		plot_y_index = i_band%2
 		title = r"$\mb{{d}}_{{{:d}{:d}}}(\mb{{k}})$ (diagonal dipole matrix elements are real)"\
@@ -567,12 +567,12 @@ def dipole_quiver_plots(K, P, sys):
 
 	counter = 0
 
-	for i_band in range(P.n):
-		for j_band in range(P.n):
+	for i_band in range(P.bands):
+		for j_band in range(P.bands):
 
 			if i_band >= j_band: continue
 
-			plot_index = P.n + counter
+			plot_index = P.bands + counter
 			plot_x_index = plot_index//2
 			plot_y_index = plot_index%2
 			counter += 1
@@ -583,7 +583,7 @@ def dipole_quiver_plots(K, P, sys):
 			plot_single_dipole(d_x.real, d_y.real, i_band, j_band, plot_x_index, plot_y_index, \
 			                   K, k_x, k_y, fig, ax, title, colbar_title)
 
-			plot_index = P.n + counter
+			plot_index = P.bands + counter
 			plot_x_index = plot_index//2
 			plot_y_index = plot_index%2
 			counter += 1
@@ -635,7 +635,7 @@ def plot_single_dipole(d_x, d_y, i_band, j_band, x, y, K, k_x, k_y, fig, ax, \
 
 def density_matrix_plot(P, T, K):
 	i_band, j_band = 1, 1
-	reshaped_pdf_dm = np.zeros((P.Nk1*P.Nk2, P.Nt_pdf_densmat, P.n, P.n), dtype=P.type_complex_np)
+	reshaped_pdf_dm = np.zeros((P.Nk1*P.Nk2, P.Nt_pdf_densmat, P.bands, P.bands), dtype=P.type_complex_np)
 
 	for i_k1 in range(P.Nk1):
 		for j_k2 in range(P.Nk2):
@@ -643,12 +643,12 @@ def density_matrix_plot(P, T, K):
 			reshaped_pdf_dm[combined_k_index, :, :, :] = T.pdf_densmat[i_k1, j_k2, :, :, :]
 
 	n_vert = (P.Nt_pdf_densmat+1)//2
-	for i_band in range(P.n):
+	for i_band in range(P.bands):
 		filename = 'dm_' + str(i_band) + str(i_band) + '.pdf'
 		plot_dm_for_all_t(reshaped_pdf_dm.real, P, T, K, i_band, i_band, '', filename, n_vert)
 
-	for i_band in range(P.n):
-		for j_band in range(P.n):
+	for i_band in range(P.bands):
+		for j_band in range(P.bands):
 			if i_band >= j_band: continue
 			filename = 'Re_dm_' + str(i_band) + str(j_band) + '.pdf'
 			plot_dm_for_all_t(reshaped_pdf_dm.real, P, T, K, i_band, j_band, 'Re', filename, n_vert)
@@ -656,7 +656,7 @@ def density_matrix_plot(P, T, K):
 			filename = 'Im_dm_' + str(i_band) + str(j_band) + '.pdf'
 			plot_dm_for_all_t(reshaped_pdf_dm.imag, P, T, K, i_band, j_band, 'Im', filename, n_vert)
 
-	replace("bandindex in {0,...,1}", "bandindex in {0,...," + str(P.n-1) + "}")
+	replace("bandindex in {0,...,1}", "bandindex in {0,...," + str(P.bands-1) + "}")
 
 
 def plot_dm_for_all_t(reshaped_pdf_dm, P, T, K, i_band, j_band, prefix_title, \

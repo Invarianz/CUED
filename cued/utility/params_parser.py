@@ -279,11 +279,6 @@ class ParamsParser():
             else:
                 self.gaussian_center       = 0
 
-
-        self.sheet_current = False
-        if 'sheet_current' in UP:
-            self.sheet_current = UP['sheet_current']
-
         self.degenerate_evals = False
         if 'degenerate_evals' in UP:
             self.degenerate_evals = UP['degenerate_evals']
