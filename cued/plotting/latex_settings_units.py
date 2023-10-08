@@ -34,43 +34,43 @@ unit = {# Band energy: electronvolts
         'A': r'$\mr{A}(t) \; (\si{\MV\per\cm\fs})$'}
 
 def parse_cued_aliases():
-	'''
-	Parse the LaTeX alias file to use aliases in matplotlib routines.
-	'''
-	alias_file_str = cued_pwd('plotting/tex_templates/CUED_aliases.tex')
-	alias_file = open(alias_file_str, 'r')
+    '''
+    Parse the LaTeX alias file to use aliases in matplotlib routines.
+    '''
+    alias_file_str = cued_pwd('plotting/tex_templates/CUED_aliases.tex')
+    alias_file = open(alias_file_str, 'r')
 
-	aliases = ''
+    aliases = ''
 
-	for line in alias_file:
-		if not line.startswith('%'):
-			aliases += line.strip()
-	
-	return aliases
+    for line in alias_file:
+        if not line.startswith('%'):
+            aliases += line.strip()
+    
+    return aliases
 
 def init_matplotlib_config():
-	packages = r'\usepackage{siunitx}' + \
-	           r'\usepackage{braket}' + \
-	           r'\usepackage{mathtools}' + \
-	           r'\usepackage{amssymb}' + \
-	           r'\usepackage[version=4]{mhchem}' + \
-	           r'\usepackage[super]{nth}'
+    packages = r'\usepackage{siunitx}' + \
+               r'\usepackage{braket}' + \
+               r'\usepackage{mathtools}' + \
+               r'\usepackage{amssymb}' + \
+               r'\usepackage[version=4]{mhchem}' + \
+               r'\usepackage[super]{nth}'
 
-	aliases = parse_cued_aliases()
+    aliases = parse_cued_aliases()
 
-	# LAYOUT
-	mpl.rc('figure', figsize=(5.295, 6.0), autolayout=True)
-	# LATEX
-	mpl.rc('text', usetex=True)
-	mpl.rc('text.latex', preamble=packages + aliases)
-	# FONT
-	mpl.rc('font', size=10, family='serif', serif='CMU Serif')
-	# mpl.rc('mathtext', fontset='cm')
-	# AXES
-	mpl.rc('axes', titlesize=10, labelsize=10)
-	# LEGEND
-	mpl.rc('legend', fancybox=False, fontsize=10, framealpha=1, labelspacing=0.08,
-	       borderaxespad=0.05)
-	# PGF
-	mpl.rc('pgf', texsystem='lualatex', preamble=packages + aliases)
-	mpl.use('Agg')
+    # LAYOUT
+    mpl.rc('figure', figsize=(5.295, 6.0), autolayout=True)
+    # LATEX
+    mpl.rc('text', usetex=True)
+    mpl.rc('text.latex', preamble=packages + aliases)
+    # FONT
+    mpl.rc('font', size=10, family='serif', serif='CMU Serif')
+    # mpl.rc('mathtext', fontset='cm')
+    # AXES
+    mpl.rc('axes', titlesize=10, labelsize=10)
+    # LEGEND
+    mpl.rc('legend', fancybox=False, fontsize=10, framealpha=1, labelspacing=0.08,
+           borderaxespad=0.05)
+    # PGF
+    mpl.rc('pgf', texsystem='lualatex', preamble=packages + aliases)
+    mpl.use('Agg')

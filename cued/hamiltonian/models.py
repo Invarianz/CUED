@@ -4,9 +4,9 @@ import sympy as sp
 from cued.hamiltonian.generic import TwoBandHamiltonianSystem
 
 
-############################################################################################
+########################################
 # Two Band Hamiltonians for analytic evaluation
-############################################################################################
+########################################
 
 class Haldane(TwoBandHamiltonianSystem):
     """

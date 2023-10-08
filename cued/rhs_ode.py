@@ -44,15 +44,11 @@ def make_rhs_ode_2_band(sys, electric_field, P):
 
     sys.make_eigensystem_dipole(P)
 
-    ########################################
     # Wire the energies
-    ########################################
     evf = sys.efjit[0]
     ecf = sys.efjit[1]
 
-    ########################################
     # Wire the dipoles
-    ########################################
     # kx-parameter
     di_00xf = sys.Axfjit[0][0]
     di_01xf = sys.Axfjit[0][1]

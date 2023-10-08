@@ -21,7 +21,7 @@ J. Wilhelm, P. Grössing, A. Seith, J. Crewse, M. Nitsch, L. Weigl, C. Schmid, a
 
 To download the current version of the code, run
 
-    git clone https://github.com/ccmt-regensburg/Invarianz CUED
+    git clone https://github.com/Invarianz CUED
     
 Change to the directory of the code:
 
