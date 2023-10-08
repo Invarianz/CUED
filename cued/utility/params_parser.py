@@ -12,16 +12,15 @@ class ParamsParser():
     """
     def __init__(self, UP):
 
-        self.__combine_parameters(UP)
-
-    def __combine_parameters(self, UP):
-
         self.parallelize_over_points = None
 
-        # build dictionary of all parameters, exclude t_pdf_densmat, points_to_path and parameters of Gabor transformation
-        excl_set = {'__weakref__', '__doc__', '__dict__', '__module__',"t_pdf_densmat","parallelize_over_points",'gabor_gaussian_center','gabor_window_width'}
-        
-        self.user_params = sorted(UP.__dict__.keys() - excl_set)
+        # Build dictionary of all parameters, exclude:
+        excl_set = {'__weakref__', '__doc__', '__dict__', '__module__',
+                    't_pdf_densmat', 'parallelize_over_points',
+                    'gabor_gaussian_center', 'gabor_window_width'}
+
+        # Clean excl_set from UP keys
+        self.UP_keys = sorted(UP.__dict__.keys() - excl_set)
         self.t_pdf_densmat = np.array([-100, 0, 50, 100])*CoFa.fs_to_au   # Time points for printing density matrix
         if hasattr(UP, 'parallelize_over_points'):
             self.parallelize_over_points = UP.parallelize_over_points
@@ -31,40 +30,48 @@ class ParamsParser():
             self.gabor_gaussian_center = np.array(UP.gabor_gaussian_center)*CoFa.fs_to_au
         if hasattr(UP,'gabor_window_width'):
             self.gabor_window_width = np.array(UP.gabor_window_width)*CoFa.fs_to_au
-            
-            
-        # build list of parameter lists
-        self.number_of_combinations = 1
-        self.params_lists = []
-        self.params_maximum = []
 
-        for key in self.user_params:
+        # Build list of parameter lists
+        # Number of parameter combinations
+        # e.g. E0 = [0, 1], Nk2 = [5, 10] -> 4 Combinations
+        self.num_param_combinations = 1
+        # All UP parameters wrapped in lists
+        # UP_keys & UP_params_lists have all information of the UP dict
+        # except for the excl_set keys
+        self.UP_params_lists = []
+        self.UP_params_maximum = []
+
+        for key in self.UP_keys:
             self.__append_to_list(UP.__dict__[key])
 
-        # check, wheter Nk2 is given as a list
-        self.path_list = False
-        if type(UP.__dict__['Nk2']) == list or type(UP.__dict__['Nk2']) ==  np.ndarray:
-            self.path_list = True
+        # We check this in main.py for path parallelization
+        self.Nk2_is_list = False
+        if type(UP.__dict__['Nk2']) == list or\
+           type(UP.__dict__['Nk2']) == np.ndarray:
+           self.Nk2_is_list = True
 
         # Build list with all possible parameter combinations
-        self.params_combinations = list(itertools.product(*self.params_lists))
-
+        self.params_combinations = list(itertools.product(*self.UP_params_lists))
 
     def __append_to_list(self, param):
+        """
+        Check all parameters in UP for lists or ndarrays.
+        Append all parameters as lists even if they only have one element
+        """
         if type(param) == list or type(param) == np.ndarray:
             if type(param) == np.ndarray:
                 param = param.tolist()
             if not type(param[0]) == str:
-                self.params_maximum.append(np.amax(param))
+                self.UP_params_maximum.append(np.amax(param))
             else:
-                self.params_maximum.append(0)
-            self.number_of_combinations *= np.size(param)
-            self.params_lists.append(param)
+                self.UP_params_maximum.append(0)
+            self.num_param_combinations *= np.size(param)
+            self.UP_params_lists.append(param)
         else:
-            self.params_lists.append([param])
-            self.params_maximum.append(0)
+            self.UP_params_lists.append([param])
+            self.UP_params_maximum.append(0)
 
-    def construct_current_parameters_and_header(self, param_idx, UP):
+    def construct_current_parameters_and_filename(self, param_idx):
         """
         Depending on the parameter indices (could be local when using MPI)
         split lists in the params class into individual parameter sets represented by
@@ -78,23 +85,28 @@ class ParamsParser():
         """
 
         current_parameters = {}
-        self.header = ''
+        self.filename_prefix = ''
 
-        for key_idx, key in enumerate(self.user_params):
+        for key_idx, key in enumerate(self.UP_keys):
             current_parameters[key] = self.params_combinations[param_idx][key_idx]
-            string_length = len('{:.4f}'.format(self.params_maximum[key_idx]))
-            if type(UP.__dict__[key]) == list or type(UP.__dict__[key]) == np.ndarray:
+            string_length = len('{:.4f}'.format(self.UP_params_maximum[key_idx]))
+            if len(self.UP_params_lists[key_idx]) > 1:
+                # If parameter at key_idx has more than one parameter
+                # add it to the filename of the end result
                 if type(current_parameters[key]) == str:
-                    self.header += key + '=' + current_parameters[key] + '_'
+                    self.filename_prefix += key + '=' + current_parameters[key] + '_'
                 else:
-                    self.header += key + '=' + ('{:.4f}'.format(current_parameters[key])).zfill(string_length) + '_'
+                    self.filename_prefix += key + '=' + ('{:.4f}'.format(current_parameters[key])).zfill(string_length) + '_'
 
         return current_parameters
 
 
-    def distribute_parameters(self, param_idx, UP): # Take index of parameter (MPI-parallelized) and write current_parameters
+    def distribute_parameters(self, param_idx, UP):
+        '''
+        Take Index of parameter (MPI parallel) and write current parameters
+        '''
 
-        current_parameters = self.construct_current_parameters_and_header(param_idx, UP)
+        current_parameters = self.construct_current_parameters_and_filename(param_idx)
 
         self.__occupation(current_parameters)
         self.__time_scales(current_parameters)
@@ -103,7 +115,7 @@ class ParamsParser():
         self.__optional(current_parameters)
 
         # Check if user params has any ill-defined parameters
-        self.__check_user_params_for_wrong_arguments(current_parameters)
+        self.__check_UP_params_for_wrong_arguments(current_parameters)
         self.__append_derived_parameters(current_parameters)
 
 
@@ -297,22 +309,23 @@ class ParamsParser():
         if 'path_parallelization' in UP:
             self.path_parallelization = UP['path_parallelization']
 
-        #Add user defined header
-        self.user_defined_header = ''
-        if 'user_defined_header' in UP:
-            self.user_defined_header = UP['user_defined_header']
-            self.header = UP['user_defined_header'] + "_" + self.header
+        #Add user defined filename
+        self.user_filename = ''
+        if 'user_filename' in UP:
+            self.user_filename = UP['user_filename']
+            self.filename_prefix = UP['user_filename'] + "_" \
+                                   + self.filename_prefix
 
 
-    def __check_user_params_for_wrong_arguments(self, UP):
+    def __check_UP_params_for_wrong_arguments(self, UP):
         """
         Compare default paramaters with user parameters.
         If there are user parameters not defined in the parameters
         give a warning and halt the code.
         """
         default_params = self.__dict__.keys()
-        user_params = UP.keys()
-        diff_params = (default_params | user_params) - default_params
+        UP_keys = UP.keys()
+        diff_params = (default_params | UP_keys) - default_params
 
         if diff_params:
             print("Error: The following parameters have no effect inside the current run:")

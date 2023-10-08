@@ -45,7 +45,7 @@ def write_and_compile_latex_PDF(T, W, P, sys, Mpi):
 
 	high_symmetry_path_BZ = get_symmetry_path_in_BZ(P, num_points_for_plotting)
 
-	latex_dir = P.header + "latex_pdf_files"
+	latex_dir = P.filename_prefix + "latex_pdf_files"
 
 	rmdir_mkdir_chdir(latex_dir)
 
@@ -90,7 +90,7 @@ def write_and_compile_latex_PDF(T, W, P, sys, Mpi):
 
 	replace("semithick", "thick", "*")
 
-	conditional_pdflatex(P.header.replace('_', ' '), 'CUED_summary.tex')
+	conditional_pdflatex(P.filename_prefix.replace('_', ' '), 'CUED_summary.tex')
 	chdir()
 
 

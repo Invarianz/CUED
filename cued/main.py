@@ -44,21 +44,21 @@ def sbe_solver(sys, params):
     #  - Number of tasks % Nk2 = 0
     #  - Number of params % (number of tasks / Nk2 ) == 0
     #  - Number of tasks <= Nk2 * number of params
-    if Mpi.size > params.Nk2 and Mpi.size > P.number_of_combinations and not P.parallelize_over_points:
-        if Mpi.size % params.Nk2 == 0 and P.number_of_combinations % (Mpi.size/params.Nk2) == 0 and Mpi.size <= P.number_of_combinations*params.Nk2:
+    if Mpi.size > params.Nk2 and Mpi.size > P.num_param_combinations and not P.parallelize_over_points:
+        if Mpi.size % params.Nk2 == 0 and P.num_param_combinations % (Mpi.size/params.Nk2) == 0 and Mpi.size <= P.num_param_combinations*params.Nk2:
             if Mpi.rank == 0:
                 print("Parallelization over paths and parameters\n Warning: You need to know what you are doing.")
-                print("In case you choose "+str(P.number_of_combinations)+" MPI ranks, the parallelization will be much more straightforward.")
+                print("In case you choose "+str(P.num_param_combinations)+" MPI ranks, the parallelization will be much more straightforward.")
             Mpi.params_sets = int(Mpi.size/params.Nk2)
             Mpi.color = Mpi.rank//params.Nk2
             Mpi.mod = Mpi.rank%params.Nk2
-            Mpi.local_params_idx_list = list(range(P.number_of_combinations))[Mpi.color::Mpi.params_sets]
+            Mpi.local_params_idx_list = list(range(P.num_param_combinations))[Mpi.color::Mpi.params_sets]
             P.combined_parallelization = True
             P.path_parallelization = True
         else:
             ncpu_list = []
-            for i in range(2, 1+P.number_of_combinations):
-                if P.number_of_combinations % (i) == 0:
+            for i in range(2, 1+P.num_param_combinations):
+                if P.num_param_combinations % (i) == 0:
                     ncpu_list.append(i*params.Nk2)
             if Mpi.rank == 0:
                 print("For parallelization over paths and parameters, choose "
@@ -66,15 +66,15 @@ def sbe_solver(sys, params):
             system.exit()
 
     # Parallelize over parameters if there are more parameter combinations than paths
-    elif (P.number_of_combinations >= params.Nk2 or P.path_list) and not P.parallelize_over_points:
+    elif (P.Nk2_is_list or P.num_param_combinations >= params.Nk2) and not P.parallelize_over_points:
         Mpi.mod = None
-        Mpi.local_params_idx_list = Mpi.get_local_idx(P.number_of_combinations)
+        Mpi.local_params_idx_list = Mpi.get_local_idx(P.num_param_combinations)
         P.path_parallelization = False
 
     # Parallelize over paths else
     else:
         Mpi.mod = None
-        Mpi.local_params_idx_list = range(P.number_of_combinations)
+        Mpi.local_params_idx_list = range(P.num_param_combinations)
         P.path_parallelization = True
 
     # make subcommunicator
@@ -94,7 +94,6 @@ def sbe_solver(sys, params):
 def make_subcommunicators(Mpi, P):
 
     if P.combined_parallelization:
-
         Mpi.subcomm = Mpi.comm.Split(Mpi.color, Mpi.rank)
         Mpi.local_Nk2_idx_list = [Mpi.mod]
 
@@ -237,12 +236,12 @@ def run_sbe(sys, P, Mpi):
     write_current_emission_mpi(T, P, W, sys, Mpi)
 
     # Save the parameters of the calculation
-    params_name = P.header + 'params.txt'
+    params_name = P.filename_prefix + 'params.txt'
     paramsfile = open(params_name, 'w')
     paramsfile.write("Runtime: {:.16f} s \n\n".format(P.run_time))
     exceptions = {'__weakref__', '__doc__', '__dict__', '__module__', \
-                  '_ParamsParser__user_defined_field', 'header', 'mesh', 'number_of_combinations', \
-                  'params_combinations', 'params_lists', 'path_list', 'paths', 'run_time', \
+                  '_ParamsParser__user_defined_field', 'header', 'mesh', 'num_param_combinations', \
+                  'params_combinations', 'params_lists', 'Nk2_is_list', 'paths', 'run_time', \
                   't_pdf_densmat', 'type_complex_np', 'type_real_np', 'user_params'}
     for key in sorted(P.__dict__.keys() - exceptions):
         paramsfile.write(str(key) + ' = ' + str(P.__dict__[key]) + "\n")
@@ -251,14 +250,14 @@ def run_sbe(sys, P, Mpi):
 
     if P.save_full:
         # write_full_density_mpi(T, P, sys, Mpi)
-        S_name = P.header + 'dens'
+        S_name = P.filename_prefix + 'dens'
         np.savez(S_name, t=T.t, solution_full=T.solution_full, paths=P.paths)
-        J_name = P.header + 'j_k'
+        J_name = P.filename_prefix + 'j_k'
         np.savez(J_name, t=T.t, j_k_E_dir=T.j_k_E_dir, j_k_ortho=T.j_k_ortho)
 
     #save density matrix at given points in time
     if P.save_dm_t:
-        np.savez(P.header + 'time_matrix', pdf_densmat=T.pdf_densmat,
+        np.savez(P.filename_prefix + 'time_matrix', pdf_densmat=T.pdf_densmat,
                  t_pdf_densmat=T.t_pdf_densmat, A_field=T.A_field)
 
 
@@ -851,7 +850,7 @@ def calculate_fourier(T, P, W):
 def write_screening_combinations_mpi(P, params, Mpi):
     # Wait until all jobs are finished
     Mpi.comm.Barrier()
-    if Mpi.rank == 0 and P.number_of_combinations > 1:
+    if Mpi.rank == 0 and P.num_param_combinations > 1:
         write_screening_combinations(P, params)
 
 def write_screening_combinations(P, params):
@@ -872,11 +871,11 @@ def write_screening_combinations(P, params):
             screening_filename_template += key + '={' + key + '}' + '_'
 
     # Create all matrix indices
-    params_idx = [np.unravel_index(i, params_dims) for i in range(P.number_of_combinations)]
+    params_idx = [np.unravel_index(i, params_dims) for i in range(P.num_param_combinations)]
 
     # Load a reference f/f0 into memory
-    P.construct_current_parameters_and_header(0, params)
-    _t, freq_data, _d = read_dataset(path='.', prefix=P.header)
+    P.construct_current_parameters_and_filename(0)
+    _t, freq_data, _d = read_dataset(path='.', prefix=P.filename_prefix)
 
     # First E-dir, second ortho, third combined data
     S = np.empty(3, dtype=ScreeningContainers)
@@ -886,13 +885,13 @@ def write_screening_combinations(P, params):
 
     # Load all f/f0 and intensities into memory
     for i, idx in enumerate(params_idx):
-        P.construct_current_parameters_and_header(i, params)
+        P.construct_current_parameters_and_filename(i)
         # example:
         # if E0 = [1, 2], chirp = [0, 1]
         # OrderedDict puts E0 before chirp
         # E0=1, chirp=0 -> (0, 0), E0=1, chirp=1 -> (0, 1)
         # E0=2, chirp=0 -> (1, 0), E0=2, chirp=1 -> (1, 1)
-        _t, freq_data, _d = read_dataset(path='.', prefix=P.header)
+        _t, freq_data, _d = read_dataset(path='.', prefix=P.filename_prefix)
         if not np.all(np.equal(S[0].ff0, freq_data['f/f0'])):
             raise ValueError("For screening plots, frequency scales of all parameters need to be equal.")
         S[0].full_screening_data[idx] = freq_data['I_E_dir']
@@ -943,7 +942,7 @@ def write_screening_combinations(P, params):
             rmdir_mkdir_chdir(screening_foldername + 'latex_pdf_files')
             if P.save_screening:
                 for s in S:
-                    np.savetxt(P.user_defined_header + s.screening_filename + 'intensity_freq_data.dat',
+                    np.savetxt(P.user_filename + s.screening_filename + 'intensity_freq_data.dat',
                                np.hstack((s.ff0[:, np.newaxis], s.screening_output.T)),
                                header=screening_file_header, delimiter=' '*3, fmt="%+.18e")
             if P.save_latex_pdf:
@@ -1000,7 +999,7 @@ def write_current_emission(T, P, W, sys, Mpi):
     time_output[np.abs(time_output) <= 10e-100] = 0
     time_output[np.abs(time_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.header + 'time_data.dat', time_output, header=time_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
+    np.savetxt(P.filename_prefix + 'time_data.dat', time_output, header=time_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
 
     ##################################################
     # Frequency data save
@@ -1053,7 +1052,7 @@ def write_current_emission(T, P, W, sys, Mpi):
     freq_output[np.abs(freq_output) <= 10e-100] = 0
     freq_output[np.abs(freq_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.header + 'frequency_data.dat', freq_output, header=freq_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
+    np.savetxt(P.filename_prefix + 'frequency_data.dat', freq_output, header=freq_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
 
     if P.gabor_transformation:
         for i in range(np.size(P.gabor_gaussian_center)):
@@ -1069,7 +1068,7 @@ def write_current_emission(T, P, W, sys, Mpi):
                 freq_output[np.abs(freq_output) <= 10e-100] = 0
                 freq_output[np.abs(freq_output) >= 1e+100] = np.inf
 
-                np.savetxt(f"gabor_trafo_center={(P.gabor_gaussian_center[i]*CoFa.au_to_fs):.4f}fs_width={(P.gabor_window_width[j]*CoFa.au_to_fs):.4f}fs_" + P.header\
+                np.savetxt(f"gabor_trafo_center={(P.gabor_gaussian_center[i]*CoFa.au_to_fs):.4f}fs_width={(P.gabor_window_width[j]*CoFa.au_to_fs):.4f}fs_" + P.filename_prefix\
                     + 'frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt=dat_precision_format)
 
     if P.save_latex_pdf:
@@ -1087,7 +1086,7 @@ def write_efield_afield(T, P, W):
     time_output[np.abs(time_output) <= 10e-100] = 0
     time_output[np.abs(time_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.header + 'fields_time_data.dat', time_output, header=time_header, delimiter=' '*3, fmt="%+.18e")
+    np.savetxt(P.filename_prefix + 'fields_time_data.dat', time_output, header=time_header, delimiter=' '*3, fmt="%+.18e")
 
     freq_header = ("{:25s}" + " {:27s}"*4).format("f/f0", "Re[E_field]", "Im[E_field]", "Re[A_field]", "Im[A_field]")
     dt = T.t[1] - T.t[0]
@@ -1099,7 +1098,7 @@ def write_efield_afield(T, P, W):
     freq_output[np.abs(freq_output) <= 10e-100] = 0
     freq_output[np.abs(freq_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.header + 'fields_frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt="%+.18e")
+    np.savetxt(P.filename_prefix + 'fields_frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt="%+.18e")
 
 
 def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq, P):
