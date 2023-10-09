@@ -1,4 +1,4 @@
-import numpy as np
+from numpy import exp, pi, sin
 from cued.utility.njit import conditional_njit
 
 def make_electric_field(P):
