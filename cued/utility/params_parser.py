@@ -1,7 +1,7 @@
-from math import modf
-import sys
 import numpy as np
-import itertools
+
+from itertools import product
+from math import modf
 
 from cued.utility.constants import ConversionFactors as CoFa
 
@@ -51,7 +51,7 @@ class ParamsParser():
            self.Nk2_is_list = True
 
         # Build list with all possible parameter combinations
-        self.params_combinations = list(itertools.product(*self.UP_params_lists))
+        self.params_combinations = list(product(*self.UP_params_lists))
 
     def __append_to_list(self, param):
         """
@@ -121,15 +121,15 @@ class ParamsParser():
 
     def __occupation(self, UP):
         '''Parameters for initial occupation'''
-        self.e_fermi = UP['e_fermi']*CoFa.eV_to_au           # Fermi energy
-        self.temperature = UP['temperature']*CoFa.eV_to_au   # Temperature
+        self.e_fermi = UP['e_fermi']*CoFa.eV_to_au
+        self.temperature = UP['temperature']*CoFa.eV_to_au
 
     def __time_scales(self, UP):
         '''Time Scales'''
-        self.T1 = UP['T1']*CoFa.fs_to_au                     # Density damping time
-        self.T2 = UP['T2']*CoFa.fs_to_au                     # Coherence damping time
-        self.t0 = UP['t0']*CoFa.fs_to_au
-        self.dt = UP['dt']*CoFa.fs_to_au
+        self.T1 = UP['T1']*CoFa.fs_to_au # Density damping time
+        self.T2 = UP['T2']*CoFa.fs_to_au # Coherence damping time
+        self.t0 = UP['t0']*CoFa.fs_to_au # Total runtime
+        self.dt = UP['dt']*CoFa.fs_to_au # Time step
 
     def __field(self, UP):
         '''Electrical Driving Field'''
@@ -138,7 +138,7 @@ class ParamsParser():
         if 'electric_field_function' in UP:
             self.electric_field_function = UP['electric_field_function']
             # Make first private to set it after params check in derived params
-            self.__user_defined_field = True              # Disables all CUED specific field printouts
+            self.__user_defined_field = True # Disables all CUED specific field printouts
 
         else:
             self.electric_field_function = None           # Gets set in TimeContainers
@@ -164,7 +164,7 @@ class ParamsParser():
             self.length_BZ_ortho = UP['length_BZ_ortho']     # Size of the Brillouin zone in atomic units
             self.length_BZ_E_dir = UP['length_BZ_E_dir']     # -"-
         else:
-            sys.exit("BZ_type needs to be either hexagon or rectangle.")
+            raise SystemExit("BZ_type needs to be either hexagon or rectangle.")
 
     def __optional(self, UP):
         '''Optional parameters or default values'''
@@ -234,7 +234,7 @@ class ParamsParser():
         if 'dk_order' in UP:
             self.dk_order = UP['dk_order']                   # with length gauge (avail: 2,4,6,8)
             if self.dk_order not in [2, 4, 6, 8]:
-                sys.exit("dk_order needs to be either 2, 4, 6, or 8.")
+                raise SystemExit("dk_order needs to be either 2, 4, 6, or 8.")
 
         if self.dm_dynamics_method in ('series_expansion', 'EEA'):
 
@@ -283,7 +283,7 @@ class ParamsParser():
                 self.gaussian_window_width = UP['gaussian_window_width']*CoFa.fs_to_au
             else:
                 if self.__user_defined_field:
-                    sys.exit("Gaussian needs a width (gaussian_window_width).")
+                    raise SystemExit("Gaussian needs a width (gaussian_window_width).")
                 else:
                     self.gaussian_window_width = self.sigma
             if 'gaussian_center' in UP:
@@ -333,13 +333,13 @@ class ParamsParser():
                 print(param, end=' ')
             print("Please delete them from params.py and rerun CUED. CUED will stop now.")
             print()
-            sys.exit()
+            raise SystemExit()
 
     def __append_derived_parameters(self, UP):
-        ##################################################
-        ## The following parameters are derived parameters
-        ## and can not be set in the params.py file
-        ##################################################
+        """
+        The following parameters are derived parameters
+        and can not be set in the params.py file
+        """
 
         self.user_defined_field = self.__user_defined_field
 
@@ -351,9 +351,9 @@ class ParamsParser():
             self.type_real_np = np.float128
             self.type_complex_np = np.complex256
             if self.solver_method != 'rk4':
-                sys.exit("Error: Quadruple precision only works with Runge-Kutta 4 ODE solver.")
+                raise SystemExit("Error: Quadruple precision only works with Runge-Kutta 4 ODE solver.")
         else:
-            sys.exit("Only default or quadruple precision available.")
+            raise SystemExit("Only default or quadruple precision available.")
 
         # Derived initial condition
         self.e_fermi_eV = UP['e_fermi']

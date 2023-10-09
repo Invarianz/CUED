@@ -1,10 +1,11 @@
-from itertools import product
 import numpy as np
+
+from itertools import product
+from numba import njit
 from numpy.fft import fftshift, fft, ifftshift, ifft, fftfreq
 from scipy.integrate import ode
-import time
+from time import perf_counter
 from typing import OrderedDict
-from numba import njit
 
 from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
 from cued.utility.params_parser import ParamsParser
@@ -138,7 +139,7 @@ def run_sbe(sys, P, Mpi):
 
     """
     # Start time of sbe_solver
-    start_time = time.perf_counter()
+    start_time = perf_counter()
 
     # Make Brillouin zone (saved in P)
     make_BZ(P)
@@ -227,7 +228,7 @@ def run_sbe(sys, P, Mpi):
     mpi_sum_currents(T, P, Mpi)
 
     # End time of solver loop
-    end_time = time.perf_counter()
+    end_time = perf_counter()
     P.run_time = end_time - start_time
 
     # calculate and write solutions

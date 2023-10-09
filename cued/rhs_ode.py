@@ -1,7 +1,5 @@
 import numpy as np
-import numpy.linalg as lin
 from cued.utility.njit import conditional_njit, evaluate_njit_matrix
-
 
 def make_rhs_ode_2_band(sys, electric_field, P):
     """

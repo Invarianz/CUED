@@ -1,8 +1,5 @@
 import numpy as np
-import numpy.linalg as lin
-from cued.utility.constants import ConversionFactors as co
 from cued.utility.njit import conditional_njit, evaluate_njit_matrix
-
 
 ########################################
 # Observables for the 2-band code
