@@ -9,10 +9,9 @@ import tikzplotlib
 from cued.plotting.colormap import whitedarkjet
 from cued.plotting.helpers import contourf_remove_white_lines, label_inner
 from cued.plotting.latex_settings_units import init_matplotlib_config, unit, symb
-from cued.utility.constants import ConversionFactors as CoFa
+from cued.utility.constants import (au_to_fs, au_to_MVpcm, au_to_eV)
 from cued.utility.dir import rmdir_mkdir_chdir, cued_copy, chdir
 from cued.kpoint_mesh import hex_mesh, rect_mesh
-
 init_matplotlib_config()
 
 def conditional_pdflatex(name_data, name_tex):
@@ -34,7 +33,7 @@ def conditional_pdflatex(name_data, name_tex):
 
 def write_and_compile_latex_PDF(T, W, P, sys, Mpi):
 
-	t_fs = T.t*CoFa.au_to_fs
+	t_fs = T.t*au_to_fs
 	num_points_for_plotting = 960
 
 	t_idx = get_time_indices_for_plotting(T.E_field, t_fs, num_points_for_plotting)
@@ -55,8 +54,8 @@ def write_and_compile_latex_PDF(T, W, P, sys, Mpi):
 
 	write_parameters(P, Mpi)
 
-	tikz_time(T.E_field*CoFa.au_to_MVpcm, t_fs, t_idx, r'E-field ' + unit['E'], "Efield")
-	tikz_time(T.A_field*CoFa.au_to_MVpcm*CoFa.au_to_fs, t_fs, t_idx, r'A-field ' + unit['A'], "Afield")
+	tikz_time(T.E_field*au_to_MVpcm, t_fs, t_idx, r'E-field ' + unit['E'], "Efield")
+	tikz_time(T.A_field*au_to_MVpcm*au_to_fs, t_fs, t_idx, r'A-field ' + unit['A'], "Afield")
 
 	K = BZ_plot(P, T.A_field)
 
@@ -312,7 +311,7 @@ def BZ_plot(P, A_field):
 		# polar angle of upper right point of a rectangle that is horizontally aligned
 		alpha = np.arctan(P.length_BZ_ortho/P.length_BZ_E_dir)
 		beta  = P.angle_inc_E_field/360*2*np.pi
-		dist_edge_to_Gamma = np.sqrt(P.length_BZ_E_dir**2+P.length_BZ_ortho**2)/2/CoFa.au_to_as
+		dist_edge_to_Gamma = np.sqrt(P.length_BZ_E_dir**2+P.length_BZ_ortho**2)/2/au_to_as
 		kx_BZ = dist_edge_to_Gamma*np.array([np.cos(alpha+beta),np.cos(np.pi-alpha+beta),np.cos(alpha+beta+np.pi),np.cos(2*np.pi-alpha+beta),np.cos(alpha+beta)])
 		ky_BZ = dist_edge_to_Gamma*np.array([np.sin(alpha+beta),np.sin(np.pi-alpha+beta),np.sin(alpha+beta+np.pi),np.sin(2*np.pi-alpha+beta),np.sin(alpha+beta)])
 		plt.plot(kx_BZ, ky_BZ, color='black' )
@@ -365,17 +364,17 @@ def BZ_plot(P, A_field):
 		num_k				 = np.size(path[:,0])
 		plot_path_x			 = np.zeros(num_k+1)
 		plot_path_y			 = np.zeros(num_k+1)
-		plot_path_x[0:num_k] = 1/CoFa.au_to_as*path[0:num_k, 0]
-		plot_path_x[num_k]	 = 1/CoFa.au_to_as*path[0, 0]
-		plot_path_y[0:num_k] = 1/CoFa.au_to_as*path[0:num_k, 1]
-		plot_path_y[num_k]	 = 1/CoFa.au_to_as*path[0, 1]
+		plot_path_x[0:num_k] = 1/au_to_as*path[0:num_k, 0]
+		plot_path_x[num_k]	 = 1/au_to_as*path[0, 0]
+		plot_path_y[0:num_k] = 1/au_to_as*path[0:num_k, 1]
+		plot_path_y[num_k]	 = 1/au_to_as*path[0, 1]
 
 		if P.gauge == "length":
 			plt.plot(plot_path_x, plot_path_y)
 		plt.plot(plot_path_x, plot_path_y, color='gray', marker="o", linestyle='None')
 
-	A_min = np.amin(A_field)/CoFa.au_to_as
-	A_max = np.amax(A_field)/CoFa.au_to_as
+	A_min = np.amin(A_field)/au_to_as
+	A_max = np.amax(A_field)/au_to_as
 	A_diff = A_max - A_min
 
 	adjusted_length_x = length_x - dist_to_border/2
@@ -440,7 +439,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 
 	_fig, (ax1) = plt.subplots(1)
 	for i_band in range(P.bands):
-		_lines_exact_E_dir = ax1.plot(k_in_path, sys.e_in_path[:,i_band]*CoFa.au_to_eV, marker='', \
+		_lines_exact_E_dir = ax1.plot(k_in_path, sys.e_in_path[:,i_band]*au_to_eV, marker='', \
 		                              label="$n=$ "+str(i_band))
 	plot_it(P, r"Band energy " + unit['e(k)'], "bandstructure.tikz", ax1, k_in_path)
 	plt.close(_fig)
@@ -450,7 +449,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 	if P.dm_dynamics_method == 'semiclassics':
 		for i_band in range(P.bands):
 			abs_connection = (np.sqrt( np.abs(sys.Ax_path[:, i_band, i_band])**2 + \
-			                  np.abs(sys.Ay_path[:, i_band, i_band])**2 ) + 1.0e-80)*CoFa.au_to_as
+			                  np.abs(sys.Ay_path[:, i_band, i_band])**2 ) + 1.0e-80)*au_to_as
 			_lines_exact_E_dir= ax2.semilogy(k_in_path, abs_connection, marker='', \
 			                                 label="$n=$ "+str(i_band))
 			d_min = max(d_min, np.amin(abs_connection))
@@ -461,7 +460,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 			for j_band in range(P.bands):
 				if j_band >= i_band: continue
 				abs_dipole = (np.sqrt(np.abs(sys.dipole_path_x[:, i_band, j_band])**2 + \
-				              np.abs(sys.dipole_path_y[:, i_band, j_band])**2) + 1.0e-80)*CoFa.au_to_as
+				              np.abs(sys.dipole_path_y[:, i_band, j_band])**2) + 1.0e-80)*au_to_as
 				_lines_exact_E_dir	= ax2.semilogy(k_in_path, abs_dipole, marker='', \
 				                                   label="$n=$ "+str(i_band)+", $m=$ "+str(j_band))
 				d_min = max(d_min, np.amin(abs_dipole))
@@ -474,7 +473,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 	if P.dm_dynamics_method == 'semiclassics':
 		for i_band in range(P.bands):
 			proj_connection = (np.abs( sys.Ax_path[:,i_band,i_band]*P.E_dir[0] + \
-			                   sys.Ay_path[:, i_band, i_band]*P.E_dir[1] ) + 1.0e-80)*CoFa.au_to_as
+			                   sys.Ay_path[:, i_band, i_band]*P.E_dir[1] ) + 1.0e-80)*au_to_as
 			_lines_exact_E_dir = ax3.semilogy(k_in_path, proj_connection, marker='',
 			                                   label="$n=$ "+str(i_band))
 			d_min = max(d_min, np.amin(proj_connection))
@@ -485,7 +484,7 @@ def bandstruc_and_dipole_plot_high_symm_line(high_symmetry_path_BZ, P, num_point
 			for j_band in range(P.bands):
 				if j_band >= i_band: continue
 				proj_dipole = (np.abs( sys.dipole_path_x[:,i_band,j_band]*P.E_dir[0] + \
-				               sys.dipole_path_y[:,i_band,j_band]*P.E_dir[1] ) + 1.0e-80)/CoFa.au_to_as
+				               sys.dipole_path_y[:,i_band,j_band]*P.E_dir[1] ) + 1.0e-80)/au_to_as
 				_lines_exact_E_dir = ax3.semilogy(k_in_path, proj_dipole, marker='', \
 				                                  label="$n=$ "+str(i_band)+", $m=$ "+str(j_band))
 				d_min = max(d_min, np.amin(proj_dipole))
@@ -544,10 +543,10 @@ def dipole_quiver_plots(K, P, sys):
 
 		sys.eigensystem_dipole_path(path, P)
 
-		d_x[k_path*P.Nk1:(k_path+1)*P.Nk1, :, :] = sys.dipole_path_x[:,:,:]*CoFa.au_to_as
-		d_y[k_path*P.Nk1:(k_path+1)*P.Nk1, :, :] = sys.dipole_path_y[:,:,:]*CoFa.au_to_as
-		k_x[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,0]/CoFa.au_to_as
-		k_y[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,1]/CoFa.au_to_as
+		d_x[k_path*P.Nk1:(k_path+1)*P.Nk1, :, :] = sys.dipole_path_x[:,:,:]*au_to_as
+		d_y[k_path*P.Nk1:(k_path+1)*P.Nk1, :, :] = sys.dipole_path_y[:,:,:]*au_to_as
+		k_x[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,0]/au_to_as
+		k_y[k_path*P.Nk1:(k_path+1)*P.Nk1]		 = path[:,1]/au_to_as
 
 	num_plots = P.bands**2
 	num_plots_vert = (num_plots+1)//2
@@ -675,7 +674,7 @@ def plot_dm_for_all_t(reshaped_pdf_dm, P, T, K, i_band, j_band, prefix_title, \
 			maxval += 1E-6
 
 		if P.Nk2 > 1:
-			im = ax[i, j].tricontourf(P.mesh[:, 0].astype('float64')/CoFa.au_to_as, P.mesh[:, 1].astype('float64')/CoFa.au_to_as,
+			im = ax[i, j].tricontourf(P.mesh[:, 0].astype('float64')/au_to_as, P.mesh[:, 1].astype('float64')/au_to_as,
 			                       reshaped_pdf_dm[:, t_i, i_band, j_band].astype('float64'),
 			                       np.linspace(minval, maxval, 100), cmap=whitedarkjet)
 
@@ -688,13 +687,13 @@ def plot_dm_for_all_t(reshaped_pdf_dm, P, T, K, i_band, j_band, prefix_title, \
 			ax[i, j].set_ylabel(unit['ky'])
 
 		else:
-			im = ax[i,j].plot(P.mesh[:, 0]/CoFa.au_to_as, reshaped_pdf_dm[:, t_i, i_band, j_band])
+			im = ax[i,j].plot(P.mesh[:, 0]/au_to_as, reshaped_pdf_dm[:, t_i, i_band, j_band])
 
 		ax[i, j].set_xlabel(unit['kx'])
 		ax[i, j].set_xlim(-K.length_x, K.length_x)
 		ax[i, j].set_title(prefix_title +
 		                   r' $\rho_{{{:d},{:d}}}(\mb{{k}},t)$ at $t = {:.1f}\si{{\fs}}$'\
-		                   .format(i_band, j_band, T.t_pdf_densmat[t_i]*CoFa.au_to_fs))
+		                   .format(i_band, j_band, T.t_pdf_densmat[t_i]*au_to_fs))
 
 	plt.savefig(filename, bbox_inches='tight')
 	plt.close(fig)

@@ -4,15 +4,15 @@ from numba import njit
 
 from cued.hamiltonian.models import Semiconductor
 from cued.main import sbe_solver
-from cued.utility.constants import ConversionFactors as co
+from cued.utility.constants import (MVpcm_to_au, fs_to_au, eV_to_au)
 
 
 def make_gaussian(E0, sigma):
     """
     Creates a jitted version of the electric field for fast use inside a solver
     """
-    E0 = E0 * co.MVpcm_to_au
-    sigma = sigma * co.fs_to_au
+    E0 = E0 * MVpcm_to_au
+    sigma = sigma * fs_to_au
     @njit
     def electric_field(t):
         '''
@@ -26,10 +26,10 @@ def make_gaussian(E0, sigma):
 
 def model():
     # Hamiltonian Parameters
-    A = 2 * co.eV_to_au
+    A = 2 * eV_to_au
 
     # Gaps used in the dirac system
-    mx = 0.05 * co.eV_to_au
+    mx = 0.05 * eV_to_au
     muz = 0.033
 
     semich_bite_system = Semiconductor(A=A, mz=muz, mx=mx, a=8.28834, nature=True)
@@ -38,8 +38,8 @@ def model():
 
 def run(system):
 
-    E0 = 1e-1                        # MV/cm
-    sigma = 20                       # fs
+    E0 = 1e-1  # MV/cm
+    sigma = 20 # fs
     params.electric_field_function = make_gaussian(E0, sigma)
     sbe_solver(system, params)
 

@@ -35,7 +35,6 @@ class params:
     # Flags for testing and features
     ##########################################################################
     gauge                   = 'velocity'          # Gauge of the system
-    solver                  = '2band'
     fourier_window_function = 'gaussian'
     split_current           = True
     user_out                = False               # True to get user plotting and progress output

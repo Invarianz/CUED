@@ -9,7 +9,6 @@ from typing import OrderedDict
 
 from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
 from cued.utility.params_parser import ParamsParser
-from cued.utility.constants import ConversionFactors as CoFa
 from cued.utility.multicore import MpiHelpers
 from cued.utility.dir import rmdir_mkdir_chdir, chdir
 from cued.plotting.latex_output_pdf import write_and_compile_latex_PDF, write_and_compile_screening_latex_PDF
@@ -1069,7 +1068,7 @@ def write_current_emission(T, P, W, sys, Mpi):
                 freq_output[np.abs(freq_output) <= 10e-100] = 0
                 freq_output[np.abs(freq_output) >= 1e+100] = np.inf
 
-                np.savetxt(f"gabor_trafo_center={(P.gabor_gaussian_center[i]*CoFa.au_to_fs):.4f}fs_width={(P.gabor_window_width[j]*CoFa.au_to_fs):.4f}fs_" + P.filename_prefix\
+                np.savetxt(f"gabor_trafo_center={(P.gabor_gaussian_center[i] * au_to_fs):.4f}fs_width={(P.gabor_window_width[j] * au_to_fs):.4f}fs_" + P.filename_prefix\
                     + 'frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt=dat_precision_format)
 
     if P.save_latex_pdf:

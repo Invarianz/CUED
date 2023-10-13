@@ -39,7 +39,6 @@ class params:
     # Flags for testing and features
     ##########################################################################
     gauge                   = 'velocity'   # Gauge of the system
-    solver                  = '2band'
     fourier_window_function = 'gaussian'
     user_out                = True
     plot_format             = 'png'

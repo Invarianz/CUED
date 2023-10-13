@@ -39,6 +39,5 @@ class params:
     # Flags for testing and features
     ##########################################################################
     gauge                   = 'length'           # Gauge of the system
-    solver                  = '2band'
     fourier_window_function = 'hann'
     user_out                = False

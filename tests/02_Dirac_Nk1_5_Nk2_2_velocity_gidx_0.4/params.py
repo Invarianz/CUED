@@ -38,7 +38,6 @@ class params:
     ##########################################################################
     gauge                   = 'velocity'         # Gauge of the system
     gidx                    = 0.4
-    solver                  = '2band'
     fourier_window_function = 'gaussian'
     split_current           = True
     user_out                = False

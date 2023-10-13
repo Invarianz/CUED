@@ -3,7 +3,8 @@ import numpy as np
 from itertools import product
 from math import modf
 
-from cued.utility.constants import ConversionFactors as CoFa
+from cued.utility.constants import (T_to_au, au_to_as, fs_to_au, THz_to_au,
+                                    MVpcm_to_au, eV_to_au)
 
 class ParamsParser():
     """
@@ -21,15 +22,16 @@ class ParamsParser():
 
         # Clean excl_set from UP keys
         self.UP_keys = sorted(UP.__dict__.keys() - excl_set)
-        self.t_pdf_densmat = np.array([-100, 0, 50, 100])*CoFa.fs_to_au   # Time points for printing density matrix
         if hasattr(UP, 'parallelize_over_points'):
             self.parallelize_over_points = UP.parallelize_over_points
+        # Time points for printing density matrix
+        self.t_pdf_densmat = np.array([-100, 0, 50, 100]) * fs_to_au
         if hasattr(UP, 't_pdf_densmat'):
-            self.t_pdf_densmat = np.array(UP.t_pdf_densmat)*CoFa.fs_to_au # Time points for printing density matrix
+            self.t_pdf_densmat = np.array(UP.t_pdf_densmat) * fs_to_au 
         if hasattr(UP,'gabor_gaussian_center'):
-            self.gabor_gaussian_center = np.array(UP.gabor_gaussian_center)*CoFa.fs_to_au
+            self.gabor_gaussian_center = np.array(UP.gabor_gaussian_center) * fs_to_au
         if hasattr(UP,'gabor_window_width'):
-            self.gabor_window_width = np.array(UP.gabor_window_width)*CoFa.fs_to_au
+            self.gabor_window_width = np.array(UP.gabor_window_width) * fs_to_au
 
         # Build list of parameter lists
         # Number of parameter combinations
@@ -121,19 +123,19 @@ class ParamsParser():
 
     def __occupation(self, UP):
         '''Parameters for initial occupation'''
-        self.e_fermi = UP['e_fermi']*CoFa.eV_to_au
-        self.temperature = UP['temperature']*CoFa.eV_to_au
+        self.e_fermi = UP['e_fermi'] * eV_to_au
+        self.temperature = UP['temperature'] * eV_to_au
 
     def __time_scales(self, UP):
         '''Time Scales'''
-        self.T1 = UP['T1']*CoFa.fs_to_au # Density damping time
-        self.T2 = UP['T2']*CoFa.fs_to_au # Coherence damping time
-        self.t0 = UP['t0']*CoFa.fs_to_au # Total runtime
-        self.dt = UP['dt']*CoFa.fs_to_au # Time step
+        self.T1 = UP['T1'] * fs_to_au # Density damping time
+        self.T2 = UP['T2'] * fs_to_au # Coherence damping time
+        self.t0 = UP['t0'] * fs_to_au # Total runtime
+        self.dt = UP['dt'] * fs_to_au # Time step
 
     def __field(self, UP):
         '''Electrical Driving Field'''
-        self.f = UP['f']*CoFa.THz_to_au                      # Driving pulse frequency
+        self.f = UP['f'] * THz_to_au # Driving pulse frequency
 
         if 'electric_field_function' in UP:
             self.electric_field_function = UP['electric_field_function']
@@ -141,46 +143,46 @@ class ParamsParser():
             self.__user_defined_field = True # Disables all CUED specific field printouts
 
         else:
-            self.electric_field_function = None           # Gets set in TimeContainers
-            self.E0 = UP['E0']*CoFa.MVpcm_to_au              # Driving pulse field amplitude
-            self.chirp = UP['chirp']*CoFa.THz_to_au          # Pulse chirp frequency
-            self.sigma = UP['sigma']*CoFa.fs_to_au           # Gaussian pulse width
-            self.phase = UP['phase']                         # Carrier-envelope phase
+            self.electric_field_function = None  # Gets set in TimeContainers
+            self.E0 = UP['E0'] * MVpcm_to_au     # Driving pulse field amplitude
+            self.chirp = UP['chirp'] * THz_to_au # Pulse chirp frequency
+            self.sigma = UP['sigma'] * fs_to_au  # Gaussian pulse width
+            self.phase = UP['phase']             # Carrier-envelope phase
             self.__user_defined_field = False
 
     def __brillouin_zone(self, UP):
         '''Brillouin zone/Lattice'''
-        self.BZ_type = UP['BZ_type']                         # Type of Brillouin zone
-        self.Nk1 = UP['Nk1']                                 # kpoints in b1 direction
-        self.Nk2 = UP['Nk2']                                 # kpoints in b2 direction
+        self.BZ_type = UP['BZ_type'] # Type of Brillouin zone
+        self.Nk1 = UP['Nk1']         # kpoints in b1 direction
+        self.Nk2 = UP['Nk2']         # kpoints in b2 direction
 
         if self.BZ_type == 'hexagon':
-            self.align = UP['align']                         # E-field alignment
-            self.angle_inc_E_field = None
-            self.a = UP['a']                                 # Lattice spacing
+            self.align = UP['align']      # E-field alignment
+            self.angle_inc_E_field = None # Incoming field angle
+            self.a = UP['a']              # Lattice spacing
         elif self.BZ_type == 'rectangle':
             self.align = None
             self.angle_inc_E_field = UP['angle_inc_E_field']
-            self.length_BZ_ortho = UP['length_BZ_ortho']     # Size of the Brillouin zone in atomic units
-            self.length_BZ_E_dir = UP['length_BZ_E_dir']     # -"-
+            self.length_BZ_ortho = UP['length_BZ_ortho']     # BZ in au
+            self.length_BZ_E_dir = UP['length_BZ_E_dir']     # BZ in au
         else:
             raise SystemExit("BZ_type needs to be either hexagon or rectangle.")
 
     def __optional(self, UP):
         '''Optional parameters or default values'''
-        self.user_out = True                              # Command line progress output
+        self.user_out = True # Command line progress output
         if 'user_out' in UP:
             self.user_out = UP['user_out']
 
-        self.save_full = False                            # Save full density matrix
+        self.save_full = False # Save full density matrix
         if 'save_full' in UP:
             self.save_full = UP['save_full']
 
-        self.save_latex_pdf = False                       # Save data as human readable PDF file
+        self.save_latex_pdf = False # Save data as human readable PDF file
         if 'save_latex_pdf' in UP:
             self.save_latex_pdf = UP['save_latex_pdf']
 
-        self.save_dm_t = False                            # Save density matrix at given points in time
+        self.save_dm_t = False # Save density matrix at given points in time
         if 'save_dm_t' in UP:
             self.save_dm_t = UP['save_dm_t']
 
@@ -188,11 +190,11 @@ class ParamsParser():
         if 'save_fields' in UP:
             self.save_fields = UP['save_fields']
 
-        self.split_current = False                        # Save j^intra, j^anom, dP^inter/dt
+        self.split_current = False # Save j^intra, j^anom, dP^inter/dt
         if 'split_current' in UP:
             self.split_current = UP['split_current']
 
-        self.save_screening = False                       # Write screening files even with save_latex_pdf=False
+        self.save_screening = False # Write screening files even with save_latex_pdf=False
         if 'save_screening' in UP:
             self.save_screening = UP['save_screening']
 
@@ -200,19 +202,19 @@ class ParamsParser():
         if 'plot_format' in UP:
             self.plot_format = UP['plot_format']
 
-        self.gauge = 'length'                             # Gauge of the SBE Dynamics
+        self.gauge = 'length' # Gauge of the SBE Dynamics
         if 'gauge' in UP:
             self.gauge = UP['gauge']
 
-        self.solver = 'nband'                             # 2 or n band solver
+        self.solver = '2band'
         if 'solver' in UP:
             self.solver = UP['solver']
 
-        self.epsilon = 2e-5                               # Step size for num. derivatives
+        self.epsilon = 2e-5 # Step size for num. derivatives
         if 'epsilon' in UP:
             self.epsilon = UP['epsilon']
 
-        self.gidx = 1                                     # Index of real wave function entry (fixes gauge)
+        self.gidx = 1 # Index of real wave function entry (fixes gauge)
         if 'gidx' in UP:
             self.gidx = UP['gidx']
 
@@ -280,14 +282,14 @@ class ParamsParser():
 
         if self.fourier_window_function == 'gaussian':
             if 'gaussian_window_width' in UP:
-                self.gaussian_window_width = UP['gaussian_window_width']*CoFa.fs_to_au
+                self.gaussian_window_width = UP['gaussian_window_width']*fs_to_au
             else:
                 if self.__user_defined_field:
                     raise SystemExit("Gaussian needs a width (gaussian_window_width).")
                 else:
                     self.gaussian_window_width = self.sigma
             if 'gaussian_center' in UP:
-                self.gaussian_center = UP['gaussian_center']*CoFa.fs_to_au
+                self.gaussian_center = UP['gaussian_center']*fs_to_au
             else:
                 self.gaussian_center       = 0
 
@@ -303,7 +305,7 @@ class ParamsParser():
         # Value of Magnetic field strength in Tesla if Zeeman flag is set true
         self.zeeman_strength = 0.0
         if 'zeeman_strength' in UP:
-            self.zeeman_strength = UP['zeeman_strength']*0.5*CoFa.T_to_au
+            self.zeeman_strength = UP['zeeman_strength']*0.5*T_to_au
 
         #Flag for path parallelization, default value determined in main.py
         if 'path_parallelization' in UP:
@@ -392,6 +394,6 @@ class ParamsParser():
         # Derived BZ parameter
         self.Nk = self.Nk1 * self.Nk2
         if self.BZ_type == 'hexagon':
-            self.a_angs = self.a*CoFa.au_to_as
+            self.a_angs = self.a*au_to_as
 
         self.Nt_pdf_densmat = np.size(self.t_pdf_densmat)
