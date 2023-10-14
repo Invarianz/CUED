@@ -7,6 +7,7 @@ from scipy.integrate import ode
 from time import perf_counter
 from typing import OrderedDict
 
+from cued.utility.constants import au_to_fs
 from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
 from cued.utility.params_parser import ParamsParser
 from cued.utility.multicore import MpiHelpers
