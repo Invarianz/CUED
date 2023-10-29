@@ -74,7 +74,9 @@ def check_test(testdir, refdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    os.system('mpiexec -c ' + str(current_mpi_num_procs) + ' python -W ignore ' + os.path.join(testdir, 'runscript.py'))
+    mpijob = ["mpiexec", "-n", str(current_mpi_num_procs), "python", "-W",
+              "ignore", os.path.join(testdir, 'runscript.py')]
+    subprocess.run(mpijob, check=True)
     os.chdir(prev_dir)
     ##################################
 
@@ -230,7 +232,7 @@ def create_reference_data(testdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    mpijob = ["mpiexec", "-c", str(current_mpi_num_procs), "python", "-W",
+    mpijob = ["mpiexec", "-n", str(current_mpi_num_procs), "python", "-W",
               "ignore", os.path.join(testdir, 'runscript.py')]
     result = subprocess.run(mpijob, check=True)
     for output_file in os.listdir(testdir):
