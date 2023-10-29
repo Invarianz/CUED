@@ -8,14 +8,14 @@ class conditional_njit():
     """
     njit execution only with double precision
     """
-    def __init__(self, precision):
+    def __init__(self, precision, **kwargs):
         self.precision = precision
+        self.kwargs = kwargs
 
     def __call__(self, func):
-        if self.precision in (np.float128, np.complex256):
+        if self.precision in (np.longdouble, np.longcomplex):
             return func
-        return njit(func)
-
+        return njit(func, **self.kwargs)
 
 def matrix_to_njit_functions(sf, hsymbols, dtype=np.complex128, kpflag=False):
     """
@@ -57,12 +57,12 @@ def __to_njit_function_k(sf, hsymbols, kx, ky, dtype=np.complex128):
     contains_k = bool(sf.free_symbols.intersection(kset))
     if contains_k:
         # All free Hamiltonian symbols get function parameters
-        if dtype == np.complex256:
+        if dtype == np.longcomplex:
             return lambdify(list(hsymbols), sf, np)
         return njit(lambdify(list(hsymbols), sf, np))
     # Here we have non k variables in sf. Expand sf by 0*kx*ky
     sf = sf + kx*ky*sp.UnevaluatedExpr(0)
-    if dtype == np.complex256:
+    if dtype == np.longcomplex:
         return lambdify(list(hsymbols), sf, np)
     return njit(lambdify(list(hsymbols), sf, np))
 
@@ -74,12 +74,12 @@ def __to_njit_function_kp(sf, hsymbols, kx, ky, kxp, kyp, dtype=np.complex128):
     contains_k = bool(sf.free_symbols.intersection(kset))
     if contains_k:
         # All free Hamiltonian symbols get function parameters
-        if dtype == np.complex256:
+        if dtype == np.longcomplex:
             return lambdify(list(hsymbols), sf, np)
         return njit(lambdify(list(hsymbols), sf, np))
 
     sf = sf + kx*ky*kxp*kyp*sp.UnevaluatedExpr(0)
-    if dtype == np.complex256:
+    if dtype == np.longcomplex:
         return lambdify(list(hsymbols), sf, np)
     return njit(lambdify(list(hsymbols), sf, np))
 

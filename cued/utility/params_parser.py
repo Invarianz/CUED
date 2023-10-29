@@ -350,8 +350,8 @@ class ParamsParser():
             self.type_real_np = np.float64
             self.type_complex_np = np.complex128
         elif self.precision == 'quadruple':
-            self.type_real_np = np.float128
-            self.type_complex_np = np.complex256
+            self.type_real_np = np.longdouble
+            self.type_complex_np = np.longcomplex
             if self.solver_method != 'rk4':
                 raise SystemExit("Error: Quadruple precision only works with Runge-Kutta 4 ODE solver.")
         else:

@@ -4,8 +4,10 @@ import argparse
 import numpy as np
 import shutil
 import subprocess
-import importlib.util
-import sys
+
+from importlib.util import module_from_spec, spec_from_file_location
+from importlib.machinery import ModuleSpec
+from typing import Optional
 
 from cued import HEADPATH
 from cued.plotting.read_data import read_dataset
@@ -72,7 +74,7 @@ def check_test(testdir, refdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    os.system('mpirun -n ' + str(current_mpi_num_procs) + ' python -W ignore ' + os.path.join(testdir, 'runscript.py'))
+    os.system('mpiexec -c ' + str(current_mpi_num_procs) + ' python -W ignore ' + os.path.join(testdir, 'runscript.py'))
     os.chdir(prev_dir)
     ##################################
 
@@ -183,9 +185,12 @@ def import_params(filename_params):
     it changes the number of started jobs for the file.
     """
 
-    spec = importlib.util.spec_from_file_location("params", filename_params)
-    params = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(params)
+    spec: Optional[ModuleSpec] = spec_from_file_location("params", filename_params)
+    if spec is not None:
+        params = module_from_spec(spec)
+        spec.loader.exec_module(params) # type: ignore
+    else:
+        raise FileNotFoundError(f"File {filename_params} not found.")
     if hasattr(params, 'MPI_NUM_PROCS'):
         current_mpi_num_procs = params.MPI_NUM_PROCS
     else:
@@ -225,7 +230,7 @@ def create_reference_data(testdir):
     ##################################
     prev_dir = os.getcwd()
     os.chdir(testdir)
-    mpijob = ["mpirun", "-n", str(current_mpi_num_procs), "python", "-W",
+    mpijob = ["mpiexec", "-c", str(current_mpi_num_procs), "python", "-W",
               "ignore", os.path.join(testdir, 'runscript.py')]
     result = subprocess.run(mpijob, check=True)
     for output_file in os.listdir(testdir):
@@ -275,7 +280,12 @@ def parser():
     parser = argparse.ArgumentParser()
     parser.add_argument("-p", "--path", type=str, default='tests',
                         help="Relative testpath with respect to top level CUED dir.")
-    parser.add_argument("-n", "--mpin", type=int, default=os.cpu_count()//2,
+    cpu_count: Optional[int] = os.cpu_count()
+    if cpu_count is not None:
+        default_mpi_jobs = cpu_count//2
+    else:
+        default_mpi_jobs = 1
+    parser.add_argument("-n", "--mpin", type=int, default=default_mpi_jobs,
                         help="Number of mpi jobs")
     parser.add_argument("-t", "--test_type", type=str, default="test",
                         help="Do 'test' or redo 'reference' files.")
