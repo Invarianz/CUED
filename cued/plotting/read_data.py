@@ -50,7 +50,7 @@ def read_dataset(path, prefix='', suffix='', mute=False):
 
     for filename in filelist:
         # Time data
-        filepath = path + '/' + filename
+        filepath = os.path.join(path, filename)
         if (filename.startswith(time_string) and '.dat' in filename):
             if not mute:
                 print("Reading time data:", filepath)
