@@ -245,7 +245,6 @@ def make_rhs_ode_2_band(sys, electric_field, P):
     else:
         raise AttributeError("You have to either assign velocity or length gauge")
 
-
     # The python solver does not directly accept jitted functions so we wrap it
     def f(t, y, kpath, dipole_in_path, e_in_path, y0, dk):
         return freturn(t, y, kpath, dipole_in_path, e_in_path, y0, dk)

@@ -19,6 +19,13 @@
                 "host": "127.0.0.1",
                 "port": 5678
             }
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
         }
     ]
 }
