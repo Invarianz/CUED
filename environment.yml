@@ -1,4 +1,4 @@
-name: test
+name: cued
 channels:
   - conda-forge
 
@@ -10,3 +10,4 @@ dependencies:
   - scipy >= 1.11.1
   - sympy >= 1.12.0
   - tikzplotlib >= 0.10.1
+  - pyqt
