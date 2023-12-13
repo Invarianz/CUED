@@ -5,6 +5,7 @@ from numba import njit
 from numpy.fft import fftshift, fft, ifftshift, ifft, fftfreq
 from scipy.integrate import ode
 from time import perf_counter
+
 from typing import OrderedDict
 
 from cued.utility.constants import au_to_fs
@@ -20,7 +21,10 @@ from cued.rhs_ode import *
 
 import sys as system
 
-def sbe_solver(sys, params):
+def sbe_solver(
+    sys,
+    params
+):
     """
     Function that initializes MPI-parallelization and distributes parameters that are given as a
     list in the params.py file to the individual MPI-processes. Runs the SBE-calculation for each
@@ -92,7 +96,10 @@ def sbe_solver(sys, params):
     if P.save_screening or P.save_latex_pdf:
         write_screening_combinations_mpi(P, params, Mpi)
 
-def make_subcommunicators(Mpi, P):
+def make_subcommunicators(
+    Mpi,
+    P
+):
 
     if P.combined_parallelization:
         Mpi.subcomm = Mpi.comm.Split(Mpi.color, Mpi.rank)
@@ -111,7 +118,11 @@ def make_subcommunicators(Mpi, P):
         Mpi.subcomm = Mpi.comm.Split(Mpi.rank, Mpi.rank)
 
 
-def run_sbe(sys, P, Mpi):
+def run_sbe(
+    sys,
+    P,
+    Mpi
+):
     """
     line numberSolver for the semiconductor bloch equation ( eq. (39) or (47) in https://arxiv.org/abs/2008.03177)
     for a n band system with numerical calculation of the dipole elements (analytical dipoles
@@ -262,7 +273,9 @@ def run_sbe(sys, P, Mpi):
                  t_pdf_densmat=T.t_pdf_densmat, A_field=T.A_field)
 
 
-def make_BZ(P):
+def make_BZ(
+    P
+):
         # Form Brillouin Zone
     if P.BZ_type == 'hexagon':
         if P.align == 'K':
@@ -294,7 +307,11 @@ def make_BZ(P):
         P.Nk1 = 1
         P.Nk2 = Nk1_buf * Nk2_buf
 
-def make_rhs_ode(P, T, sys):
+def make_rhs_ode(
+    P,
+    T,
+    sys
+):
 
     if P.dm_dynamics_method in ('sbe', 'semiclassics'):
         if P.solver == '2band':
@@ -317,7 +334,12 @@ def make_rhs_ode(P, T, sys):
     return rhs_ode, solver
 
 
-def prepare_current_calculations(path, Nk2_idx, P, sys):
+def prepare_current_calculations(
+    path,
+    Nk2_idx,
+    P,
+    sys
+):
 
     polarization_inter_path = None
     current_intra_path = None
@@ -331,7 +353,14 @@ def prepare_current_calculations(path, Nk2_idx, P, sys):
     return current_exact_path, polarization_inter_path, current_intra_path
 
 
-def calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi):
+def calculate_solution_at_timestep(
+    solver,
+    Nk2_idx,
+    ti,
+    T,
+    P,
+    Mpi 
+):
 
     is_first_Nk2_idx = (Mpi.local_Nk2_idx_list[0] == Nk2_idx)
 
@@ -379,7 +408,12 @@ def calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi):
         store_density_matrix_for_pdf(T, P, Nk2_idx, ti)
 
 
-def store_density_matrix_for_pdf(T, P, Nk2_idx, ti):
+def store_density_matrix_for_pdf(
+    T,
+    P,
+    Nk2_idx,
+    ti
+):
 
     for count, t_pdf_densmat in enumerate(P.t_pdf_densmat):
         if (t_pdf_densmat > T.t[ti-1] and t_pdf_densmat < T.t[ti]) or t_pdf_densmat == T.t[ti]:
@@ -387,26 +421,37 @@ def store_density_matrix_for_pdf(T, P, Nk2_idx, ti):
             T.t_pdf_densmat[count] = T.t[ti]
 
 
-def calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path, current_intra_path,
-                       T, P):
+def calculate_currents(
+    Nk2_idx,
+    ti,
+    current_exact_path,
+    polarization_inter_path,
+    current_intra_path,
+    T,
+    P
+):
 
     if (P.save_full == True and P.gauge == 'length'):
         # j_k_E_dir_path & j_k_ortho_path are containers for the full k-grid current
         # if save_full is True, i.e. all densities and the full k-grid current should
         # be written to disk
-        j_E_dir_buf, j_ortho_buf = current_exact_path(T.solution, T.E_field[ti], T.A_field[ti],
-                                                      T.j_k_E_dir_path, T.j_k_ortho_path)
+        j_E_dir_buf, j_ortho_buf =\
+            current_exact_path(T.solution, T.E_field[ti], T.A_field[ti],
+                               T.j_k_E_dir_path, T.j_k_ortho_path)
         T.j_k_E_dir[:, Nk2_idx, ti] = T.j_k_E_dir_path
         T.j_k_ortho[:, Nk2_idx, ti] = T.j_k_ortho_path
     else:
-        j_E_dir_buf, j_ortho_buf = current_exact_path(T.solution, T.E_field[ti], T.A_field[ti])
+        j_E_dir_buf, j_ortho_buf =\
+            current_exact_path(T.solution, T.E_field[ti], T.A_field[ti])
 
     T.j_E_dir[ti] += j_E_dir_buf
     T.j_ortho[ti] += j_ortho_buf
 
     if P.split_current:
-        P_E_dir_buf, P_ortho_buf = polarization_inter_path(T.solution, T.E_field[ti], T.A_field[ti])
-        j_intra_E_dir_buf, j_intra_ortho_buf, j_anom_ortho_buf = current_intra_path(T.solution, T.E_field[ti], T.A_field[ti])
+        P_E_dir_buf, P_ortho_buf =\
+            polarization_inter_path(T.solution, T.E_field[ti], T.A_field[ti])
+        j_intra_E_dir_buf, j_intra_ortho_buf, j_anom_ortho_buf =\
+            current_intra_path(T.solution, T.E_field[ti], T.A_field[ti])
 
         T.P_E_dir[ti] += P_E_dir_buf
         T.P_ortho[ti] += P_ortho_buf
@@ -414,7 +459,16 @@ def calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path,
         T.j_intra_ortho[ti] += j_intra_ortho_buf
         T.j_anom_ortho[ti, :] += j_anom_ortho_buf
 
-def rk_integrate(t, y, kpath, sys, y0, dk, dt, rhs_ode):
+def rk_integrate(
+    t,
+    y,
+    kpath,
+    sys,
+    y0,
+    dk,
+    dt,
+    rhs_ode
+):
 
     k1 = rhs_ode(t,          y,          kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
     k2 = rhs_ode(t + 0.5*dt, y + 0.5*k1, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
@@ -482,7 +536,17 @@ def y0deriv(y, dk, Nk_path, n, dk_order, type_complex_np):
 
     return diffy0
 
-def von_neumann_series(t, A_field, E_field, path, sys, y0, time_integral, P, ti):
+def von_neumann_series(
+    t,
+    A_field,
+    E_field,
+    path,
+    sys,
+    y0,
+    time_integral,
+    P,
+    ti
+):
 
     # rescale solution vector and initial condition to be a matrix
     y_mat = np.zeros((P.Nk1, P.bands, P.bands), dtype=P.type_complex_np)
@@ -604,7 +668,8 @@ def initial_condition(P, e_in_path):
     num_kpoints = e_in_path[:, 0].size
     num_bands = e_in_path[0, :].size
     distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
-    initial_condition = np.zeros([num_kpoints, num_bands, num_bands], dtype=P.type_complex_np)
+    initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
+                                 dtype=P.type_complex_np)
     if P.temperature > 1e-5:
         distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
     else:
@@ -1078,7 +1143,11 @@ def write_current_emission(T, P, W, sys, Mpi):
         write_and_compile_latex_PDF(T, W, P, sys, Mpi)
 
 
-def write_efield_afield(T, P, W):
+def write_efield_afield(
+    T,
+    P,
+    W
+):
 
     time_header = ("{:25s}" + " {:27s}"*2).format("t", "E_field", "A_field")
     time_output = np.column_stack([T.t.real, T.E_field, T.A_field])
@@ -1102,7 +1171,14 @@ def write_efield_afield(T, P, W):
     np.savetxt(P.filename_prefix + 'fields_frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt="%+.18e")
 
 
-def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq, P):
+def fourier_current_intensity(
+    jt,
+    window_function,
+    dt_out,
+    prefac_emission,
+    freq,
+    P
+):
 
     ndt_fft = freq.size
     ndt = np.size(jt, axis=0)
@@ -1137,7 +1213,12 @@ def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq
     return Iw, jw
 
 
-def print_user_info(P, B0=None, mu=None, incident_angle=None):
+def print_user_info(
+    P,
+    B0=None,
+    mu=None,
+    incident_angle=None
+):
     """
     Function that prints the input parameters if usr_info = True
     """

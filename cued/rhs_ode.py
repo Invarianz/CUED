@@ -193,7 +193,7 @@ def make_rhs_ode_2_band(sys, electric_field, P):
         return ecv_in_path, dipole_in_path, A_in_path
 
     @conditional_njit(P.type_complex_np)
-    def fvelocity(t, y, kpath, dipole_in_path, e_in_path, y0, dk):
+    def fvelocity(t, y, kpath, dipole_in_path, _e_in_path, y0, _dk):
         """
         Velocity gauge needs a recalculation of energies and dipoles as k
         is shifted according to the vector potential A

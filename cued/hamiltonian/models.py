@@ -177,7 +177,7 @@ class BiTeFit(TwoBandHamiltonianSystem):
         self,
         C0: Union[int, float, sp.Symbol] = sp.Symbol('C0', real=True),
         c2: Union[int, float, sp.Symbol] = sp.Symbol('c2', real=True),
-        A: Union[int, float sp.Symbol] = sp.Symbol('A', real=True),
+        A: Union[int, float, sp.Symbol] = sp.Symbol('A', real=True),
         r: Union[int, float, sp.Symbol] = sp.Symbol('r', real=True),
         ksym: Union[int, float, sp.Symbol] = sp.Symbol('ksym', real=True),
         kasym: Union[int, float, sp.Symbol] = sp.Symbol('kasym', real=True)
