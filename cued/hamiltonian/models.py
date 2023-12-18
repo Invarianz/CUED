@@ -183,13 +183,13 @@ class BiTeFit(TwoBandHamiltonianSystem):
         kasym: Union[int, float, sp.Symbol] = sp.Symbol('kasym', real=True)
     ):
 
-        k = sp.sqrt(self.kx**2 + self.ky**2)
-        C2 = (c2/ksym**2)/(1+(k/ksym)**2)
-        R = (r/kasym**2)/(1+(k/kasym)**4)
-        ho = C0 + C2*(self.kx**2 + self.ky**2)
-        hx = A*self.ky
-        hy = -A*self.kx
-        hz = 2*R*self.kx*(self.kx**2 - 3*self.ky**2)
+        k = sp.sqrt(self.kx**2 + self.ky**2) # type: ignore
+        C2 = (c2/ksym**2)/(1+(k/ksym)**2) # type: ignore
+        R = (r/kasym**2)/(1+(k/kasym)**4) # type: ignore
+        ho = C0 + C2*(self.kx**2 + self.ky**2) # type: ignore
+        hx = A*self.ky # type: ignore
+        hy = -A*self.kx #type: ignore 
+        hz = 2*R*self.kx*(self.kx**2 - 3*self.ky**2) # type: ignore
 
         super().__init__(ho, hx, hy, hz)
 
@@ -203,7 +203,8 @@ class Dirac(TwoBandHamiltonianSystem):
         self,
         vx: Union[int, float, sp.Symbol] = sp.Symbol('vx'),
         vy: Union[int, float, sp.Symbol] = sp.Symbol('vy'),
-        m: Union[int, float, sp.Symbol] = sp.Symbol('m')):
+        m: Union[int, float, sp.Symbol] = sp.Symbol('m')
+    ):
 
         ho = 0
         hx = vx*self.kx
@@ -225,7 +226,7 @@ class Test(TwoBandHamiltonianSystem):
         ho = 0
         hx = mx
         hy = 0
-        hz = A*(2 + mz - sp.cos((2*a/3)*self.kx) - sp.cos((2*a/3)*self.ky))
+        hz = A*(2 + mz - sp.cos((2*a/3)*self.kx) - sp.cos((2*a/3)*self.ky)) # type: ignore 
 
         super().__init__(ho, hx, hy, hz)
 
@@ -238,8 +239,8 @@ class Parabolic(TwoBandHamiltonianSystem):
     ):
 
         ho = 0
-        hx = A*(self.ky**2)
-        hy = A*(self.kx**2)
+        hx = A*(self.ky**2) # type: ignore
+        hy = A*(self.kx**2) # type: ignore
         hz = mz
 
         super().__init__(ho, hx, hy, hz)
@@ -256,14 +257,15 @@ class Semiconductor(TwoBandHamiltonianSystem):
         mx: Union[int, float, sp.Symbol] = sp.Symbol('mx'),
         mz: Union[int, float, sp.Symbol] = sp.Symbol('mz'),
         a: Union[int, float, sp.Symbol] = sp.Symbol('a'),
-        nature: bool = False):
+        nature: bool = False
+    ):
         ho = 0
         hx = mx
         hy = 0
 
         if (nature):
-            hz = A*(2 + mz - sp.cos((2*a/3)*self.kx) - sp.cos((2*a/3)*self.ky))
+            hz = A*(2 + mz - sp.cos((2*a/3)*self.kx) - sp.cos((2*a/3)*self.ky)) # type: ignore
         else:
-            hz = A*(2 + mz - sp.cos((3*a/4)*self.kx) - sp.cos((3*a/4)*self.ky))
+            hz = A*(2 + mz - sp.cos((3*a/4)*self.kx) - sp.cos((3*a/4)*self.ky)) # type: ignore
 
         super().__init__(ho, hx, hy, hz)

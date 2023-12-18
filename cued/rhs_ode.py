@@ -2,9 +2,15 @@ import numpy as np
 
 from numba import vectorize 
 
+from typing import Callable
+
 from cued.utility.njit import conditional_njit, evaluate_njit_matrix
 
-def make_rhs_ode_2_band(sys, electric_field, P):
+def make_rhs_ode_2_band(
+    sys,
+    electric_field,
+    P
+) -> Callable:
     """
         Initialization of the solver for the sbe ( eq. (39/47/80) in https://arxiv.org/abs/2008.03177)
 

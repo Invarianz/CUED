@@ -3,8 +3,10 @@ import sympy as sp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from cued.utility.njit import list_to_njit_functions, matrix_to_njit_functions,\
-                              evaluate_njit_matrix
+from typing import Union
+
+from cued.utility.njit import (list_to_njit_functions, matrix_to_njit_functions,
+                               evaluate_njit_matrix)
 
 class TwoBandHamiltonianSystem():
     so = sp.Matrix([[1, 0], [0, 1]])
@@ -19,7 +21,13 @@ class TwoBandHamiltonianSystem():
     m_zee_y = sp.Symbol('m_zee_y', real=True)
     m_zee_z = sp.Symbol('m_zee_z', real=True)
 
-    def __init__(self, ho, hx, hy, hz, offdiagonal_k=False, test=False, kdotp=None):
+    def __init__(
+        self,
+        ho: Union[int, float, sp.Symbol],
+        hx: Union[int, float, sp.Symbol],
+        hy: Union[int, float, sp.Symbol],
+        hz: Union[int, float, sp.Symbol],
+    ):
         """
         Generates the symbolic Hamiltonian, wave functions and
         energies.
@@ -36,10 +44,6 @@ class TwoBandHamiltonianSystem():
         self.hy = hy
         self.hz = hz
 
-        self.offdiag_k = offdiagonal_k
-        self.test = test
-        self.kdotp = kdotp
-
         self.h = self.__hamiltonian()
         self.hsymbols = self.h.free_symbols
         self.hderiv = self.__hamiltonian_derivatives()
@@ -49,6 +53,7 @@ class TwoBandHamiltonianSystem():
         self.e = None
         self.ederiv = None
 
+        # Jit functions for calculating energies and energy derivatives
         self.efjit = None
         self.ederivjit = None
 
@@ -100,8 +105,8 @@ class TwoBandHamiltonianSystem():
 
 
     def __energies(self):
-        esoc = sp.sqrt(self.hx**2 + self.hy**2 + self.hz**2)
-        return [self.ho - esoc, self.ho + esoc]
+        esoc = sp.sqrt(self.hx**2 + self.hy**2 + self.hz**2) # type: ignore
+        return [self.ho - esoc, self.ho + esoc] # type: ignore
 
     def __energy_derivatives(self):
         """
@@ -115,7 +120,7 @@ class TwoBandHamiltonianSystem():
         return ed
 
     def __wave_function(self, gidx=None):
-        esoc = sp.sqrt(self.hx**2 + self.hy**2 + self.hz**2)
+        esoc = sp.sqrt(self.hx**2 + self.hy**2 + self.hz**2) # type: ignore
 
         if gidx is None:
             wfv = sp.Matrix([-self.hx + sp.I*self.hy, self.hz + esoc])
@@ -125,23 +130,15 @@ class TwoBandHamiltonianSystem():
             normv = sp.sqrt(2*(esoc + self.hz)*esoc)
             normc = sp.sqrt(2*(esoc + self.hz)*esoc)
         elif 0 <= gidx <= 1:
-            wfv_up = sp.Matrix([self.hz-esoc,
-                                (self.hx+sp.I*self.hy)])
-            wfc_up = sp.Matrix([self.hz+esoc,
-                                (self.hx+sp.I*self.hy)])
-            wfv_up_h = sp.Matrix([self.hz-esoc,
-                                  (self.hx-sp.I*self.hy)])
-            wfc_up_h = sp.Matrix([self.hz+esoc,
-                                  (self.hx-sp.I*self.hy)])
+            wfv_up = sp.Matrix([self.hz - esoc, (self.hx+sp.I*self.hy)])
+            wfc_up = sp.Matrix([self.hz + esoc, (self.hx+sp.I*self.hy)])
+            wfv_up_h = sp.Matrix([self.hz-esoc, (self.hx-sp.I*self.hy)])
+            wfc_up_h = sp.Matrix([self.hz+esoc, (self.hx-sp.I*self.hy)])
 
-            wfv_do = sp.Matrix([-self.hx+sp.I*self.hy,
-                                self.hz+esoc])
-            wfc_do = sp.Matrix([-self.hx+sp.I*self.hy,
-                                self.hz-esoc])
-            wfv_do_h = sp.Matrix([-self.hx-sp.I*self.hy,
-                                  self.hz+esoc])
-            wfc_do_h = sp.Matrix([-self.hx-sp.I*self.hy,
-                                  self.hz-esoc])
+            wfv_do = sp.Matrix([-self.hx+sp.I*self.hy, self.hz+esoc])
+            wfc_do = sp.Matrix([-self.hx+sp.I*self.hy, self.hz-esoc])
+            wfv_do_h = sp.Matrix([-self.hx-sp.I*self.hy, self.hz+esoc])
+            wfc_do_h = sp.Matrix([-self.hx-sp.I*self.hy, self.hz-esoc])
 
             wfv = (1-gidx)*wfv_up + gidx*wfv_do
             wfc = (1-gidx)*wfc_up + gidx*wfc_do
@@ -195,8 +192,9 @@ class TwoBandHamiltonianSystem():
             self.dipole_path_x = evaluate_njit_matrix(self.Axfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
             self.dipole_path_y = evaluate_njit_matrix(self.Ayfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
-        for n, e in enumerate(self.efjit):
-            self.e_in_path[:, n] = e(kx=kx_in_path, ky=ky_in_path)
+        # Evaluate energies for each band
+        for n, efjit in enumerate(self.efjit):
+            self.e_in_path[:, n] = efjit(kx=kx_in_path, ky=ky_in_path)
 
         self.wf_in_path = evaluate_njit_matrix(self.Ujit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
@@ -212,7 +210,7 @@ class TwoBandHamiltonianSystem():
         self.e = self.__energies()
         self.ederiv = self.__energy_derivatives()
 
-                # Jitted Hamiltonian and energies
+        # Jitted Hamiltonian and energies
         self.hfjit = matrix_to_njit_functions(self.h, self.hsymbols, dtype=P.type_complex_np)
         self.hderivfjit = [matrix_to_njit_functions(hd, self.hsymbols, dtype=P.type_complex_np)
                            for hd in self.hderiv]
@@ -222,26 +220,19 @@ class TwoBandHamiltonianSystem():
 
         self.eigensystem(P)
 
-        if self.kdotp is None:
-            self.Ax, self.Ay = self.__fields(self.U, self.U_h)
-        else:
-            self.Ax, self.Ay = self.__kdotp_fields(self.kdotp, self.e[0], self.e[1])
+        self.Ax, self.Ay = self.__fields(self.U, self.U_h)
 
         # Njit function and function arguments
         self.Axfjit = matrix_to_njit_functions(self.Ax, self.hsymbols, dtype=P.type_complex_np)
         self.Ayfjit = matrix_to_njit_functions(self.Ay, self.hsymbols, dtype=P.type_complex_np)
 
-        if self.offdiag_k:
-            self.offdiagonal_k(self.U)
-
         # Curvature
-
         self.B = sp.diff(self.Ax, self.ky) - sp.diff(self.Ay, self.kx)
         self.Bfjit = matrix_to_njit_functions(self.B, self.hsymbols, dtype=P.type_complex_np)
 
         if P.dm_dynamics_method == 'EEA':
             self.dipole_derivative = P.E_dir[0] * P.E_dir[0] * sp.diff(self.Ax, self.kx) \
-                + P.E_dir[0] * P.E_dir[1] * ( sp.diff(self.Ax, self.ky) + sp.diff(self.Ay, self.kx) ) \
+                + P.E_dir[0] * P.E_dir[1] * (sp.diff(self.Ax, self.ky) + sp.diff(self.Ay, self.kx)) \
                 + P.E_dir[1] * P.E_dir[1] * sp.diff(self.Ay, self.ky)
             self.dipole_derivative_jit = matrix_to_njit_functions(self.dipole_derivative, self.hsymbols, dtype=P.type_complex_np)
 

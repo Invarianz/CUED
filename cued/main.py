@@ -6,7 +6,7 @@ from numpy.fft import fftshift, fft, ifftshift, ifft, fftfreq
 from scipy.integrate import ode
 from time import perf_counter
 
-from typing import OrderedDict
+from typing import cast, Callable, OrderedDict, Tuple, Union
 
 from cued.utility.constants import au_to_fs
 from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
@@ -26,9 +26,9 @@ def sbe_solver(
     params
 ):
     """
-    Function that initializes MPI-parallelization and distributes parameters that are given as a
-    list in the params.py file to the individual MPI-processes. Runs the SBE-calculation for each
-    parameter combination.
+    Function that initializes MPI-parallelization and distributes parameters
+    that are given as a list in the params.py file to the individual
+    MPI-processes. Runs the SBE-calculation for each parameter combination.
 
     Parameters
     ----------
@@ -124,9 +124,10 @@ def run_sbe(
     Mpi
 ):
     """
-    line numberSolver for the semiconductor bloch equation ( eq. (39) or (47) in https://arxiv.org/abs/2008.03177)
-    for a n band system with numerical calculation of the dipole elements (analytical dipoles
-    can be used for n=2)
+    line numberSolver for the semiconductor bloch equation
+    ( eq. (39) or (47) in https://arxiv.org/abs/2008.03177)
+    for a n band system with numerical calculation of the dipole elements
+    (analytical dipoles can be used for n=2)
 
     Parameters
     ----------
@@ -189,7 +190,6 @@ def run_sbe(
             prepare_current_calculations(path, Nk2_idx, P, sys)
 
         # Initialize the values of of each k point vector
-
         y0 = initial_condition(P, sys.e_in_path)
         y0 = np.append(y0, [0.0])
 
@@ -202,7 +202,8 @@ def run_sbe(
                 T.solution_y_vec[:] = y0
         elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
             T.solution_y_vec = np.copy(y0)
-            T.time_integral = np.zeros((P.Nk1, P.bands, P.bands), dtype=P.type_complex_np)
+            T.time_integral = np.zeros((P.Nk1, P.bands, P.bands),
+                                       dtype=P.type_complex_np)
         # Propagate through time
         # Index of current integration time step
         ti = 0
@@ -216,7 +217,8 @@ def run_sbe(
             calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi)
 
             # Calculate the currents at the timestep ti
-            calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path, current_intra_path,
+            calculate_currents(Nk2_idx, ti, current_exact_path,
+                               polarization_inter_path, current_intra_path,
                                T, P)
 
             # Integrate one integration time step
@@ -226,11 +228,14 @@ def run_sbe(
                     solver_successful = solver.successful()
 
                 elif P.solver_method == 'rk4':
-                    T.solution_y_vec = rk_integrate(T.t[ti], T.solution_y_vec, path, sys,
-                                                    y0, P.dk, P.dt, rhs_ode)
+                    T.solution_y_vec =\
+                        rk_integrate(T.t[ti], T.solution_y_vec, path, sys, y0,
+                                     P.dk, P.dt, rhs_ode)
 
             elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
-                T.solution_y_vec[:-1], T.time_integral = von_neumann_series(T.t[ti], T.A_field[ti], T.E_field[ti], path, sys, y0[:-1], T.time_integral, P, ti)
+                T.solution_y_vec[:-1], T.time_integral =\
+                    von_neumann_series(T.t[ti], T.A_field[ti], T.E_field[ti],
+                                       path, sys, y0[:-1], T.time_integral, P, ti)
 
             # Increment time counter
             ti += 1
@@ -311,7 +316,7 @@ def make_rhs_ode(
     P,
     T,
     sys
-):
+) -> Tuple[Union[Callable, int], Union[ode, int]]:
 
     if P.dm_dynamics_method in ('sbe', 'semiclassics'):
         if P.solver == '2band':
@@ -580,12 +585,20 @@ def von_neumann_series(
 
         if P.first_order:
             if P.high_damping:
-                y_mat = first_order_high_damping(y_mat, y0_mat, t, E_field, sys.e_in_path, sys.dipole_in_path, P.T2, P.bands)
+                y_mat =\
+                    first_order_high_damping(y_mat, y0_mat, t, E_field,
+                                             sys.e_in_path, sys.dipole_in_path,
+                                             P.T2, P.bands)
             else:
-                y_mat, time_integral = first_order(y_mat, time_integral, y0_mat, t, E_field, A_field, sys.e_in_path, sys.dipole_in_path, P.T2, P.dt, P.bands, P.gauge, P.diffy0)
+                y_mat, time_integral =\
+                    first_order(y_mat, time_integral, y0_mat, t, E_field,
+                                A_field, sys.e_in_path, sys.dipole_in_path,
+                                P.T2, P.dt, P.bands, P.gauge, P.diffy0)
         if P.second_order:
             if P.high_damping:
-                y_mat, time_integral = second_order(y_mat, time_integral, y0_mat, E_field, sys.dipole_in_path, P.T2, P.dt, P.bands, P.Nk1)
+                y_mat, time_integral =\
+                    second_order(y_mat, time_integral, y0_mat, E_field,
+                                 sys.dipole_in_path, P.T2, P.dt, P.bands, P.Nk1)
             else:
                 print('Warning: second order without high damping not implemented yet!')
     return y_mat.flatten('C'), time_integral
@@ -664,12 +677,14 @@ def second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, dipole_i
 def initial_condition(P, e_in_path):
     '''
     Occupy conduction band according to inital Fermi energy and temperature
+    If length gauge calculate distribution, if velocity gauge leave empty.
     '''
-    num_kpoints = e_in_path[:, 0].size
-    num_bands = e_in_path[0, :].size
+    num_kpoints = e_in_path.shape[0]
+    num_bands = e_in_path.shape[1]
     distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
     initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
                                  dtype=P.type_complex_np)
+    # if P.gauge == 'length':
     if P.temperature > 1e-5:
         distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
     else:
@@ -678,6 +693,10 @@ def initial_condition(P, e_in_path):
 
     for k in range(num_kpoints):
         initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
+    # elif P.gauge == 'velocity':
+    #     # Keep initial condition empty as container
+    #     # In the velocity geauge it needs to be calculated for every k-shift
+    #     pass
     return initial_condition.flatten('C')
 
 
@@ -1043,11 +1062,12 @@ def write_current_emission(T, P, W, sys, Mpi):
                     "j_intra_E_dir", "j_intra_ortho",
                     "dtP_E_dir", "dtP_ortho", "j_deph_E_dir", "j_deph_ortho",
                     "j_intra_plus_dtP_E_dir", "j_intra_plus_dtP_ortho")
-        time_output = np.column_stack([T.t.real,
-                                       T.j_E_dir.real, T.j_ortho.real,
-                                       T.j_intra_E_dir.real, T.j_intra_ortho.real,
-                                       T.dtP_E_dir.real, T.dtP_ortho.real, T.j_deph_E_dir.real, T.j_deph_ortho.real,
-                                       T.j_intra_plus_dtP_E_dir.real, T.j_intra_plus_dtP_ortho.real])
+        time_output =\
+            np.column_stack([T.t.real,
+                             T.j_E_dir.real, T.j_ortho.real,
+                             T.j_intra_E_dir.real, T.j_intra_ortho.real,
+                             T.dtP_E_dir.real, T.dtP_ortho.real, T.j_deph_E_dir.real, T.j_deph_ortho.real,
+                             T.j_intra_plus_dtP_E_dir.real, T.j_intra_plus_dtP_ortho.real])
         if P.save_anom:
             for i in range(P.bands):
                 time_header += dat_header_format.format(f"j_anom_ortho[{i}]")
@@ -1065,7 +1085,10 @@ def write_current_emission(T, P, W, sys, Mpi):
     time_output[np.abs(time_output) <= 10e-100] = 0
     time_output[np.abs(time_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.filename_prefix + 'time_data.dat', time_output, header=time_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
+    np.savetxt(P.filename_prefix + 'time_data.dat', time_output,
+               header=time_header,
+               delimiter=dat_delimiter_format,
+               fmt=dat_precision_format)
 
     ##################################################
     # Frequency data save
