@@ -190,7 +190,9 @@ def run_sbe(
             prepare_current_calculations(path, Nk2_idx, P, sys)
 
         # Initialize the values of of each k point vector
+        # In the velocity gauge this is an empty container
         y0 = initial_condition(P, sys.e_in_path)
+        # Append empty container for A_field
         y0 = np.append(y0, [0.0])
 
         # Set the initual values and function parameters for the current kpath
@@ -674,7 +676,10 @@ def second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, dipole_i
 
     return y_mat, time_integral
 
-def initial_condition(P, e_in_path):
+def initial_condition(
+    P,
+    e_in_path
+) -> np.ndarray:
     '''
     Occupy conduction band according to inital Fermi energy and temperature
     If length gauge calculate distribution, if velocity gauge leave empty.
@@ -684,19 +689,19 @@ def initial_condition(P, e_in_path):
     distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
     initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
                                  dtype=P.type_complex_np)
-    # if P.gauge == 'length':
-    if P.temperature > 1e-5:
-        distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
-    else:
-        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
-        distrib_bands[smaller_e_fermi] += 1
+    if P.gauge == 'length':
+        if P.temperature > 1e-5:
+            distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
+        else:
+            smaller_e_fermi = (P.e_fermi - e_in_path) > 0
+            distrib_bands[smaller_e_fermi] += 1
 
-    for k in range(num_kpoints):
-        initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
-    # elif P.gauge == 'velocity':
-    #     # Keep initial condition empty as container
-    #     # In the velocity geauge it needs to be calculated for every k-shift
-    #     pass
+        for k in range(num_kpoints):
+            initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
+    elif P.gauge == 'velocity':
+        # Keep initial condition empty as container
+        # In the velocity gauge it needs to be calculated for every k-shift
+        pass
     return initial_condition.flatten('C')
 
 
