@@ -3,7 +3,7 @@ import sympy as sp
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from typing import List, Union
+from typing import List, Optional, Union
 
 from cued.utility.njit import (list_to_njit_functions, matrix_to_njit_functions,
                                evaluate_njit_matrix)
@@ -39,12 +39,16 @@ class TwoBandHamiltonianSystem():
         self.hz = hz
 
         # Hamiltonian & Hamiltonian derivatives
-        self.h = self.ho*self.so + self.hx*self.sx + self.hy*self.sy + self.hz*self.sz
+        self.h = sp.Add(sp.Mul(self.ho, self.so),
+                        sp.Mul(self.hx, self.sx),
+                        sp.Mul(self.hy, self.sy),
+                        sp.Mul(self.hz, self.sz))
         self.hderiv = [sp.diff(self.h, self.kx), sp.diff(self.h, self.ky)]
 
         # Energies (e_v, e_c) & Energy derivatives (de_v/dkx, de_v/dky, de_c/dkx, de_c/dky)
-        self.e_soc = sp.sqrt(self.hx**2 + self.hy**2 + self.hz**2) # type: ignore
-        self.e = [self.ho - self.e_soc, self.ho + self.e_soc] # type: ignore
+        self.e_soc =\
+            sp.sqrt(sp.Add(sp.Pow(self.hx, 2), sp.Pow(self.hy, 2), sp.Pow(self.hz, 2)))
+        self.e = [sp.Add(self.ho, -self.e_soc), sp.Add(self.ho, self.e_soc)]
         self.ederiv = []
         for e in self.e:
             self.ederiv.append(sp.diff(e, self.kx))
@@ -62,6 +66,11 @@ class TwoBandHamiltonianSystem():
 
         self.U_jit = None
         self.U_h_jit = None
+
+        self.Ax_jit = None
+        self.Ay_jit = None
+        
+        self.B_jit = None
 
         # Evaluated fields
         self.Ax_eval = None
@@ -85,44 +94,52 @@ class TwoBandHamiltonianSystem():
         self.dipole_derivative_jit = None
         self.dipole_derivative_in_path = None
 
-    def eigensystem_dipole_path(self, path, P):
+    def eigensystem_dipole_path(
+        self,
+        path,
+        E_dir,
+        E_ort,
+        bands,
+        dynamics_method,
+        dtype_real,
+        dtype_complex
+    ):
 
         # Set eigenfunction first time eigensystem_dipole_path is called
         if self.e is None:
-            self.make_eigensystem_dipole(P)
+            self.make_eigensystem_jit(dtype_complex)
 
         # Retrieve the set of k-points for the current path
         kx_in_path = path[:, 0]
         ky_in_path = path[:, 1]
         pathlen = path[:,0].size
-        self.e_in_path = np.zeros([pathlen, P.bands], dtype=P.type_real_np)
+        self.e_in_path = np.zeros([pathlen, bands], dtype=dtype_real)
 
-        if P.dm_dynamics_method == 'semiclassics':
-            self.dipole_path_x = np.zeros([pathlen, P.bands, P.bands], dtype=P.type_complex_np)
-            self.dipole_path_y = np.zeros([pathlen, P.bands, P.bands], dtype=P.type_complex_np)
-            self.Ax_path = evaluate_njit_matrix(self.Axfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-            self.Ay_path = evaluate_njit_matrix(self.Ayfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-            self.Bcurv = evaluate_njit_matrix(self.Bfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-
+        if dynamics_method == 'semiclassics':
+            self.dipole_path_x = np.zeros([pathlen, bands, bands], dtype=dtype_complex)
+            self.dipole_path_y = np.zeros([pathlen, bands, bands], dtype=dtype_complex)
+            self.Ax_path = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+            self.Ay_path = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+            self.Bcurv = evaluate_njit_matrix(self.B_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
         else:
             # Calculate the dipole components along the path
-            self.dipole_path_x = evaluate_njit_matrix(self.Axfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-            self.dipole_path_y = evaluate_njit_matrix(self.Ayfjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+            self.dipole_path_x = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+            self.dipole_path_y = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
 
         # Evaluate energies for each band
         for n, e_jit in enumerate(self.e_jit):
             self.e_in_path[:, n] = e_jit(kx=kx_in_path, ky=ky_in_path)
 
-        self.dipole_in_path = P.E_dir[0]*self.dipole_path_x + P.E_dir[1]*self.dipole_path_y
-        self.dipole_ortho = P.E_ort[0]*self.dipole_path_x + P.E_ort[1]*self.dipole_path_y
+        self.dipole_in_path = E_dir[0]*self.dipole_path_x + E_dir[1]*self.dipole_path_y
+        self.dipole_ortho = E_ort[0]*self.dipole_path_x + E_ort[1]*self.dipole_path_y
 
-        if P.dm_dynamics_method == 'EEA':
-            self.dipole_derivative_in_path = evaluate_njit_matrix(self.dipole_derivative_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+        if dynamics_method == 'EEA':
+            self.dipole_derivative_in_path = evaluate_njit_matrix(self.dipole_derivative_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
 
 
     def make_eigensystem_jit(
         self,
-        dtype: np.dtype
+        dtype: type = np.cdouble
     ):
         """
         Create callable compiled ("jit'ed") functions for all symbols i.e.
@@ -158,31 +175,41 @@ class TwoBandHamiltonianSystem():
 
     def eigensystem(
         self,
-        gidx: Union[int, float]
+        gidx: Optional[Union[int, float]] = None
     ):
         """
-        Generic form of Hamiltonian, energies and wave functions in a two band
-        Hamiltonian.
         Creates (symbolic) wave functions, berry connection and berry curvature.
         """
 
         if gidx is None:
-            wfv = sp.Matrix([-self.hx + sp.I*self.hy, self.hz + self.e_soc])
-            wfc = sp.Matrix([self.hz + self.e_soc, self.hx + sp.I*self.hy])
-            wfv_h = sp.Matrix([-self.hx - sp.I*self.hy, self.hz + self.e_soc])
-            wfc_h = sp.Matrix([self.hz + self.e_soc, self.hx - sp.I*self.hy])
-            normv = sp.sqrt(2*(self.e_soc + self.hz)*self.e_soc)
-            normc = sp.sqrt(2*(self.e_soc + self.hz)*self.e_soc)
+            wfv = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                             sp.Add(self.hz, self.e_soc)])
+            wfc = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                             sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfv_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                               sp.Add(self.hz, self.e_soc)])
+            wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                               sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
         elif 0 <= gidx <= 1:
-            wfv_up = sp.Matrix([self.hz - self.e_soc, (self.hx+sp.I*self.hy)])
-            wfc_up = sp.Matrix([self.hz + self.e_soc, (self.hx+sp.I*self.hy)])
-            wfv_up_h = sp.Matrix([self.hz-self.e_soc, (self.hx-sp.I*self.hy)])
-            wfc_up_h = sp.Matrix([self.hz+self.e_soc, (self.hx-sp.I*self.hy)])
+            wfv_up = sp.Matrix([sp.Add(self.hz, -self.e_soc),
+                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfc_up = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfv_up_h = sp.Matrix([sp.Add(self.hz, -self.e_soc),
+                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+            wfc_up_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
 
-            wfv_do = sp.Matrix([-self.hx+sp.I*self.hy, self.hz+self.e_soc])
-            wfc_do = sp.Matrix([-self.hx+sp.I*self.hy, self.hz-self.e_soc])
-            wfv_do_h = sp.Matrix([-self.hx-sp.I*self.hy, self.hz+self.e_soc])
-            wfc_do_h = sp.Matrix([-self.hx-sp.I*self.hy, self.hz-self.e_soc])
+            wfv_do = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                                sp.Add(self.hz, self.e_soc)])
+            wfc_do = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                                sp.Add(self.hz, self.e_soc)])
+            wfv_do_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                                  sp.Add(self.hz, self.e_soc)])
+            wfc_do_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                                  sp.Add(self.hz, -self.e_soc)])
 
             wfv = (1-gidx)*wfv_up + gidx*wfv_do
             wfc = (1-gidx)*wfc_up + gidx*wfc_do
@@ -205,7 +232,7 @@ class TwoBandHamiltonianSystem():
         self.Ay = -sp.I * self.U_h * sp.diff(self.U, self.ky)
 
         # Create Berry curvature
-        self.B = sp.diff(self.Ax, self.ky) - sp.diff(self.Ay, self.kx)
+        self.B = sp.Add(sp.diff(self.Ax, self.ky), -sp.diff(self.Ay, self.kx))
 
     def evaluate_energy(
         self,
@@ -251,13 +278,13 @@ class TwoBandHamiltonianSystem():
             keyword arguments passed to the symbolic expression
         """
         # Evaluate all kpoints without BZ
-        self.Ax_eval = evaluate_njit_matrix(self.Axfjit, kx, ky, **fkwargs)
-        self.Ay_eval = evaluate_njit_matrix(self.Ayfjit, kx, ky, **fkwargs)
+        self.Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, **fkwargs)
+        self.Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, **fkwargs)
         return self.Ax_eval, self.Ay_eval
 
     def evaluate_curvature(self, kx, ky, **fkwargs):
         # Evaluate all kpoints without BZ
 
-        self.B_eval = evaluate_njit_matrix(self.Bfjit, kx, ky, **fkwargs)
+        self.B_eval = evaluate_njit_matrix(self.B_jit, kx, ky, **fkwargs)
 
         return self.B_eval

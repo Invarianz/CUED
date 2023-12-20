@@ -169,7 +169,16 @@ def run_sbe(
     W = FrequencyContainers()
 
     # Make rhs of ode for 2band; returns 0 for series expansion
-    sys.eigensystem_dipole_path(P.paths[0], P) # change structure, such that hfjit gets calculated first
+    sys.eigensystem_dipole_path(
+        P.paths[0],
+        P.E_dir,
+        P.E_ort,
+        P.bands,
+        P.dm_dynamics_method,
+        P.type_real_np,
+        P.type_complex_np
+    )
+
     rhs_ode, solver = make_rhs_ode(P, T, sys)
 
     ###########################################################################
@@ -689,19 +698,19 @@ def initial_condition(
     distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
     initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
                                  dtype=P.type_complex_np)
-    if P.gauge == 'length':
-        if P.temperature > 1e-5:
-            distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
-        else:
-            smaller_e_fermi = (P.e_fermi - e_in_path) > 0
-            distrib_bands[smaller_e_fermi] += 1
+    # if P.gauge == 'length':
+    if P.temperature > 1e-5:
+        distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
+    else:
+        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
+        distrib_bands[smaller_e_fermi] += 1
 
-        for k in range(num_kpoints):
-            initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
-    elif P.gauge == 'velocity':
-        # Keep initial condition empty as container
-        # In the velocity gauge it needs to be calculated for every k-shift
-        pass
+    for k in range(num_kpoints):
+        initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
+    #elif P.gauge == 'velocity':
+    #    # Keep initial condition empty as container
+    #    # In the velocity gauge it needs to be calculated for every k-shift
+    #    pass
     return initial_condition.flatten('C')
 
 
