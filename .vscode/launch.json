@@ -5,20 +5,25 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: File",
+            "name": "debug.py",
             "type": "python",
             "request": "launch",
             "program": "debug.py",
             "console": "integratedTerminal"
         },
         {
-            "name": "Python: Attach",
+            "name": "test_script.py",
             "type": "python",
-            "request": "attach",
-            "connect": {
-                "host": "127.0.0.1",
-                "port": 5678
-            }
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_script.py",
+            "args": ["--path", "tests", "--mpin", "1"]
+        },
+        {
+            "name": "01_Dirac_Nk1_2_Nk2_2_velocity",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/01_Dirac_Nk1_2_Nk2_2_velocity/runscript.py",
+            "console": "integratedTerminal"
         },
         {
             "name": "Python: Current File",

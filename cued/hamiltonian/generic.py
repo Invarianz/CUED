@@ -59,6 +59,7 @@ class TwoBandHamiltonianSystem():
         self.U_h = None           # Hermitian conjugate
         self.U_no_norm = None     # Unnormalised eigenstates
         self.U_h_no_norm = None   # Hermitian conjugate
+        self.__eigensystem_called = False
 
         # Jit functions for calculating energies and energy derivatives
         self.e_jit = None
@@ -94,6 +95,130 @@ class TwoBandHamiltonianSystem():
         self.dipole_derivative_jit = None
         self.dipole_derivative_in_path = None
 
+    def make_eigensystem(
+        self,
+        gidx: Optional[Union[int, float]] = 1
+    ):
+        """
+        Creates (symbolic) wave functions, berry connection and berry curvature.
+        """
+
+        def up_down_gauge():
+            wfv = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                             sp.Add(self.hz, self.e_soc)])
+            wfc = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                             sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfv_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                               sp.Add(self.hz, self.e_soc)])
+            wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                               sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+
+            return wfv, wfc, wfv_h, wfc_h, normv, normc
+
+        def up_gauge():
+            wfv = sp.Matrix([sp.Add(self.hz, -self.e_soc),
+                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfc = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+            wfv_h = sp.Matrix([sp.Add(self.hz, -self.e_soc),
+                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+            wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
+                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
+            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+
+            return wfv, wfc, wfv_h, wfc_h, normv, normc
+
+        def down_gauge():
+            wfv = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                                sp.Add(self.hz, self.e_soc)])
+            wfc = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
+                                sp.Add(self.hz, self.e_soc)])
+            wfv_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                                  sp.Add(self.hz, self.e_soc)])
+            wfc_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
+                                  sp.Add(self.hz, -self.e_soc)])
+            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
+
+            return wfv, wfc, wfv_h, wfc_h, normv, normc
+
+        def mixed_gauge(gidx):
+            wfv_up, wfc_up, wfv_up_h, wfc_up_h, _normv_up, _normc_up =\
+                up_gauge()
+            wfv_do, wfc_do, wfv_do_h, wfc_do_h, _normv_do, _normc_do =\
+                down_gauge()
+
+            wfv = (1-gidx)*wfv_up + gidx*wfv_do
+            wfc = (1-gidx)*wfc_up + gidx*wfc_do
+            wfv_h = (1-gidx)*wfv_up_h + gidx*wfv_do_h
+            wfc_h = (1-gidx)*wfc_up_h + gidx*wfc_do_h
+            normv = sp.sqrt(wfv_h.dot(wfv))
+            normc = sp.sqrt(wfc_h.dot(wfc))
+
+            return wfv, wfc, wfv_h, wfc_h, normv, normc
+
+        if gidx is None:
+            wfv, wfc, wfv_h, wfc_h, normv, normc = up_down_gauge()
+        elif gidx == 1:
+            wfv, wfc, wfv_h, wfc_h, normv, normc = down_gauge()
+        elif gidx == 0:
+            wfv, wfc, wfv_h, wfc_h, normv, normc = up_gauge()
+        elif 0 < gidx < 1:
+            wfv, wfc, wfv_h, wfc_h, normv, normc = mixed_gauge(gidx)
+        else:
+            raise RuntimeError("gidx needs to be between 0 and 1 or None")
+
+        self.U = (wfv/normv).row_join(wfc/normc)
+        self.U_h = (wfv_h/normv).T.col_join((wfc_h/normc).T)
+
+        self.U_no_norm = (wfv).row_join(wfc)
+        self.U_h_no_norm = (wfv_h).T.col_join(wfc_h.T)
+
+        # Create Berry connection
+        # Minus sign is the charge
+        self.Ax = -sp.I * self.U_h * sp.diff(self.U, self.kx)
+        self.Ay = -sp.I * self.U_h * sp.diff(self.U, self.ky)
+
+        # Create Berry curvature
+        self.B = sp.Add(sp.diff(self.Ax, self.ky), -sp.diff(self.Ay, self.kx))
+        self.__eigensystem_called = True
+
+    def make_eigensystem_jit(
+        self,
+        dtype: type = np.cdouble
+    ):
+        """
+        Create callable compiled ("jit'ed") functions for all symbols i.e.
+        Hamiltonian, Energies, Energy derivatives, Berry Connection & Curvature
+        """
+        if not self.__eigensystem_called:
+            raise RuntimeError("Eigensystem method needs to be called first."
+                               "Wave function gauge needs manual setting.")
+        # Jitted Hamiltonian and energies
+        self.h_jit =\
+            matrix_to_njit_functions(self.h, self.h.free_symbols, dtype=dtype)
+        self.hderiv_jit =\
+            [matrix_to_njit_functions(hd, self.h.free_symbols, dtype=dtype)
+             for hd in self.hderiv]
+
+        self.e_jit =\
+            list_to_njit_functions(self.e, self.h.free_symbols, dtype=dtype)
+        self.ederiv_jit =\
+            list_to_njit_functions(self.ederiv, self.h.free_symbols, dtype=dtype)
+
+        # Njit function and function arguments
+        self.Ax_jit =\
+            matrix_to_njit_functions(self.Ax, self.h.free_symbols, dtype=dtype)
+        self.Ay_jit =\
+            matrix_to_njit_functions(self.Ay, self.h.free_symbols, dtype=dtype)
+
+        # Curvature
+        self.B_jit =\
+            matrix_to_njit_functions(self.B, self.h.free_symbols, dtype=dtype)
+
     def eigensystem_dipole_path(
         self,
         path,
@@ -104,10 +229,6 @@ class TwoBandHamiltonianSystem():
         dtype_real,
         dtype_complex
     ):
-
-        # Set eigenfunction first time eigensystem_dipole_path is called
-        if self.e is None:
-            self.make_eigensystem_jit(dtype_complex)
 
         # Retrieve the set of k-points for the current path
         kx_in_path = path[:, 0]
@@ -136,103 +257,11 @@ class TwoBandHamiltonianSystem():
         if dynamics_method == 'EEA':
             self.dipole_derivative_in_path = evaluate_njit_matrix(self.dipole_derivative_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
 
-
-    def make_eigensystem_jit(
-        self,
-        dtype: type = np.cdouble
-    ):
-        """
-        Create callable compiled ("jit'ed") functions for all symbols i.e.
-        Hamiltonian, Energies, Energy derivatives, Berry Connection & Curvature
-        """
-        # Jitted Hamiltonian and energies
-        self.h_jit =\
-            matrix_to_njit_functions(self.h, self.h.free_symbols, dtype=dtype)
-        self.hderiv_jit =\
-            [matrix_to_njit_functions(hd, self.h.free_symbols, dtype=dtype)
-             for hd in self.hderiv]
-
-        self.e_jit =\
-            list_to_njit_functions(self.e, self.h.free_symbols, dtype=dtype)
-        self.ederiv_jit =\
-            list_to_njit_functions(self.ederiv, self.h.free_symbols, dtype=dtype)
-
-        # Njit function and function arguments
-        self.Ax_jit =\
-            matrix_to_njit_functions(self.Ax, self.h.free_symbols, dtype=dtype)
-        self.Ay_jit =\
-            matrix_to_njit_functions(self.Ay, self.h.free_symbols, dtype=dtype)
-
-        # Curvature
-        self.B_jit =\
-            matrix_to_njit_functions(self.B, self.h.free_symbols, dtype=dtype)
-
 #        if P.dm_dynamics_method == 'EEA':
 #            self.dipole_derivative = P.E_dir[0] * P.E_dir[0] * sp.diff(self.Ax, self.kx) \
 #                + P.E_dir[0] * P.E_dir[1] * (sp.diff(self.Ax, self.ky) + sp.diff(self.Ay, self.kx)) \
 #                + P.E_dir[1] * P.E_dir[1] * sp.diff(self.Ay, self.ky)
 #            self.dipole_derivative_jit = matrix_to_njit_functions(self.dipole_derivative, self.h.free_symbols, dtype=P.type_complex_np)
-
-    def eigensystem(
-        self,
-        gidx: Optional[Union[int, float]] = None
-    ):
-        """
-        Creates (symbolic) wave functions, berry connection and berry curvature.
-        """
-
-        if gidx is None:
-            wfv = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
-                             sp.Add(self.hz, self.e_soc)])
-            wfc = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                             sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
-            wfv_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
-                               sp.Add(self.hz, self.e_soc)])
-            wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                               sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
-            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
-            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
-        elif 0 <= gidx <= 1:
-            wfv_up = sp.Matrix([sp.Add(self.hz, -self.e_soc),
-                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
-            wfc_up = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
-            wfv_up_h = sp.Matrix([sp.Add(self.hz, -self.e_soc),
-                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
-            wfc_up_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
-
-            wfv_do = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
-                                sp.Add(self.hz, self.e_soc)])
-            wfc_do = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
-                                sp.Add(self.hz, self.e_soc)])
-            wfv_do_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
-                                  sp.Add(self.hz, self.e_soc)])
-            wfc_do_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
-                                  sp.Add(self.hz, -self.e_soc)])
-
-            wfv = (1-gidx)*wfv_up + gidx*wfv_do
-            wfc = (1-gidx)*wfc_up + gidx*wfc_do
-            wfv_h = (1-gidx)*wfv_up_h + gidx*wfv_do_h
-            wfc_h = (1-gidx)*wfc_up_h + gidx*wfc_do_h
-            normv = sp.sqrt(wfv_h.dot(wfv))
-            normc = sp.sqrt(wfc_h.dot(wfc))
-        else:
-            raise RuntimeError("gidx needs to be between 0 and 1 or None")
-
-        self.U = (wfv/normv).row_join(wfc/normc)
-        self.U_h = (wfv_h/normv).T.col_join((wfc_h/normc).T)
-
-        self.U_no_norm = (wfv).row_join(wfc)
-        self.U_h_no_norm = (wfv_h).T.col_join(wfc_h.T)
-
-        # Create Berry connection
-        # Minus sign is the charge
-        self.Ax = -sp.I * self.U_h * sp.diff(self.U, self.kx)
-        self.Ay = -sp.I * self.U_h * sp.diff(self.U, self.ky)
-
-        # Create Berry curvature
-        self.B = sp.Add(sp.diff(self.Ax, self.ky), -sp.diff(self.Ay, self.kx))
 
     def evaluate_energy(
         self,

@@ -167,6 +167,7 @@ def run_sbe(
     # Make containers for time- and frequency- dependent observables
     T = TimeContainers(P)
     W = FrequencyContainers()
+    sys.make_eigensystem_jit()
 
     # Make rhs of ode for 2band; returns 0 for series expansion
     sys.eigensystem_dipole_path(
@@ -192,7 +193,15 @@ def run_sbe(
             print('Solving SBE for Path', Nk2_idx+1)
 
         # Evaluate the dipole components along the path
-        sys.eigensystem_dipole_path(path, P)
+        sys.eigensystem_dipole_path(
+            path,
+            P.E_dir,
+            P.E_ort,
+            P.bands,
+            P.dm_dynamics_method,
+            P.type_real_np,
+            P.type_complex_np
+        )
 
         # Prepare calculations of observables
         current_exact_path, polarization_inter_path, current_intra_path =\
@@ -588,7 +597,15 @@ def von_neumann_series(
             path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
             path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
 
-            sys.eigensystem_dipole_path(path_after_shift, P)
+            sys.eigensystem_dipole_path(
+                P.path_after_shift,
+                P.E_dir,
+                P.E_ort,
+                P.bands,
+                P.dm_dynamics_method,
+                P.type_real_np,
+                P.type_complex_np
+            )
 
         if P.gauge == 'length' :
             if ti == 0:
