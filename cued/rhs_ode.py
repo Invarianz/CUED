@@ -49,22 +49,22 @@ def make_rhs_ode_2_band(
     E_dir = P.E_dir
     gauge = P.gauge
 
-    sys.make_eigensystem_dipole(P)
+    sys.make_eigensystem_jit(type_complex_np)
 
     # Wire the energies
-    evf = sys.efjit[0]
-    ecf = sys.efjit[1]
+    evf = sys.e_jit[0]
+    ecf = sys.e_jit[1]
 
     # Wire the dipoles
     # kx-parameter
-    di_00xf = sys.Axfjit[0][0]
-    di_01xf = sys.Axfjit[0][1]
-    di_11xf = sys.Axfjit[1][1]
+    di_00xf = sys.Ax_jit[0][0]
+    di_01xf = sys.Ax_jit[0][1]
+    di_11xf = sys.Ax_jit[1][1]
 
     # ky-parameter
-    di_00yf = sys.Ayfjit[0][0]
-    di_01yf = sys.Ayfjit[0][1]
-    di_11yf = sys.Ayfjit[1][1]
+    di_00yf = sys.Ay_jit[0][0]
+    di_01yf = sys.Ay_jit[0][1]
+    di_11yf = sys.Ay_jit[1][1]
 
     @conditional_njit(P.type_complex_np)
     def flength(t, y, kpath, dipole_in_path, e_in_path, y0, dk):

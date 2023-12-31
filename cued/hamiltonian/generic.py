@@ -1,9 +1,7 @@
 import numpy as np
 import sympy as sp
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-from typing import List, Optional, Union
+from typing import cast, List, Optional, Union
 
 from cued.utility.njit import (list_to_njit_functions, matrix_to_njit_functions,
                                evaluate_njit_matrix)
@@ -195,27 +193,51 @@ class TwoBandHamiltonianSystem():
         Hamiltonian, Energies, Energy derivatives, Berry Connection & Curvature
         """
         if not self.__eigensystem_called:
+            # If this is called we can assume the following symbols to be set
+            # i.e. we cast them to the correct type
             raise RuntimeError("Eigensystem method needs to be called first."
                                "Wave function gauge needs manual setting.")
-        # Jitted Hamiltonian and energies
+
+        # Assume Matrix and Symbols since eigensystem was called
+        self.h = cast(sp.Matrix, self.h)
+        self.hderiv = cast(List[sp.Matrix], self.hderiv)
+        # Jitted Hamiltonian and Hamiltonian derivatives
         self.h_jit =\
             matrix_to_njit_functions(self.h, self.h.free_symbols, dtype=dtype)
         self.hderiv_jit =\
             [matrix_to_njit_functions(hd, self.h.free_symbols, dtype=dtype)
              for hd in self.hderiv]
 
+        # Assume Symbols since eigensystem was called
+        self.e = cast(List[sp.Symbol], self.e)
+        self.ederiv = cast(List[sp.Symbol], self.ederiv)
+        # Jitted Energies and Energy derivatives
         self.e_jit =\
             list_to_njit_functions(self.e, self.h.free_symbols, dtype=dtype)
         self.ederiv_jit =\
             list_to_njit_functions(self.ederiv, self.h.free_symbols, dtype=dtype)
 
-        # Njit function and function arguments
+        # Assume Matrix since eigensystem was called
+        self.U = cast(sp.Matrix, self.U)
+        self.U_h = cast(sp.Matrix, self.U_h)
+        # Jitted Wave functions and Wave function derivatives
+        self.U_jit =\
+            matrix_to_njit_functions(self.U, self.h.free_symbols, dtype=dtype)
+        self.U_h_jit =\
+            matrix_to_njit_functions(self.U_h, self.h.free_symbols, dtype=dtype)
+
+        # Assume Matrix since eigensystem was called
+        self.Ax = cast(sp.Matrix, self.Ax)
+        self.Ay = cast(sp.Matrix, self.Ay)
+        # Jitted Berry Connection
         self.Ax_jit =\
             matrix_to_njit_functions(self.Ax, self.h.free_symbols, dtype=dtype)
         self.Ay_jit =\
             matrix_to_njit_functions(self.Ay, self.h.free_symbols, dtype=dtype)
 
-        # Curvature
+        # Assume Matrix since eigensystem was called
+        self.B = cast(sp.Matrix, self.B)
+        # Jitted Berry Curvature
         self.B_jit =\
             matrix_to_njit_functions(self.B, self.h.free_symbols, dtype=dtype)
 

@@ -1,4 +1,7 @@
 import numpy as np
+
+from typing import cast
+
 from cued.utility.njit import conditional_njit, evaluate_njit_matrix
 
 ########################################
@@ -34,8 +37,8 @@ def make_polarization_path(path, P, sys):
     P_ortho : np.ndarray [type_real_np]
         Polarization orthogonal to E-field direction
     """
-    di_01xf = sys.Axfjit[0][1]
-    di_01yf = sys.Ayfjit[0][1]
+    di_01xf = sys.Ax_jit[0][1]
+    di_01yf = sys.Ay_jit[0][1]
 
     E_dir = P.E_dir
     E_ort = P.E_ort
@@ -58,9 +61,9 @@ def make_polarization_path(path, P, sys):
         d_E_dir = np.empty(pathlen, dtype=type_complex_np)
         d_ortho = np.empty(pathlen, dtype=type_complex_np)
 
-        if gauge == 'length':
-            kx_shift = 0
-            ky_shift = 0
+        # if gauge == 'length':
+        kx_shift = float(0)
+        ky_shift = float(0)
         if gauge == 'velocity':
             kx_shift = A_field*E_dir[0]
             ky_shift = A_field*E_dir[1]
@@ -111,14 +114,14 @@ def make_current_path(path, P, sys):
     '''
 
 
-    edxjit_v = sys.ederivfjit[0]
-    edyjit_v = sys.ederivfjit[1]
-    edxjit_c = sys.ederivfjit[2]
-    edyjit_c = sys.ederivfjit[3]
+    edxjit_v = sys.ederiv_jit[0]
+    edyjit_v = sys.ederiv_jit[1]
+    edxjit_c = sys.ederiv_jit[2]
+    edyjit_c = sys.ederiv_jit[3]
 
     if P.save_anom:
-        Bcurv_00 = sys.Bfjit[0][0]
-        Bcurv_11 = sys.Bfjit[1][1]
+        Bcurv_00 = sys.B_jit[0][0]
+        Bcurv_11 = sys.B_jit[1][1]
 
     E_dir = P.E_dir
     E_ort = P.E_ort
@@ -220,25 +223,25 @@ def make_current_exact_path_velocity(path, P, sys):
     """
     E_dir = P.E_dir
 
-    hderivx = sys.hderivfjit[0]
+    hderivx = sys.hderiv_jit[0]
     hdx_00 = hderivx[0][0]
     hdx_01 = hderivx[0][1]
     hdx_10 = hderivx[1][0]
     hdx_11 = hderivx[1][1]
 
-    hderivy = sys.hderivfjit[1]
+    hderivy = sys.hderiv_jit[1]
     hdy_00 = hderivy[0][0]
     hdy_01 = hderivy[0][1]
     hdy_10 = hderivy[1][0]
     hdy_11 = hderivy[1][1]
 
-    Ujit = sys.Ujit
+    Ujit = sys.U_jit
     U_00 = Ujit[0][0]
     U_01 = Ujit[0][1]
     U_10 = Ujit[1][0]
     U_11 = Ujit[1][1]
 
-    Ujit_h = sys.Ujit_h
+    Ujit_h = sys.U_h_jit
     U_h_00 = Ujit_h[0][0]
     U_h_01 = Ujit_h[0][1]
     U_h_10 = Ujit_h[1][0]
