@@ -248,8 +248,8 @@ def make_current_exact_path_velocity(path, P, sys):
     U_h_11 = Ujit_h[1][1]
 
     if P.dm_dynamics_method == 'semiclassics':
-        Bcurv_00 = sys.Bfjit[0][0]
-        Bcurv_11 = sys.Bfjit[1][1]
+        Bcurv_00 = sys.B_jit[0][0]
+        Bcurv_11 = sys.B_jit[1][1]
 
     E_ort = np.array([E_dir[1], -E_dir[0]])
 
@@ -398,25 +398,26 @@ def make_current_exact_path_length(path, P, sys):
         # Berry curvature container
         Bcurv = np.empty((pathlen, 2), dtype=P.type_complex_np)
 
-    h_deriv_x = evaluate_njit_matrix(sys.hderivfjit[0], kx=kx_in_path, ky=ky_in_path,
+    h_deriv_x = evaluate_njit_matrix(sys.hderiv_jit[0], kx=kx_in_path, ky=ky_in_path,
                                      dtype=P.type_complex_np)
-    h_deriv_y = evaluate_njit_matrix(sys.hderivfjit[1], kx=kx_in_path, ky=ky_in_path,
+    h_deriv_y = evaluate_njit_matrix(sys.hderiv_jit[1], kx=kx_in_path, ky=ky_in_path,
                                      dtype=P.type_complex_np)
 
     h_deriv_E_dir= h_deriv_x*E_dir[0] + h_deriv_y*E_dir[1]
     h_deriv_ortho = h_deriv_x*E_ort[0] + h_deriv_y*E_ort[1]
 
-    U = evaluate_njit_matrix(sys.Ujit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-    U_h = evaluate_njit_matrix(sys.Ujit_h, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    U = evaluate_njit_matrix(sys.U_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    U_h = evaluate_njit_matrix(sys.U_h_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
     if P.dm_dynamics_method == 'semiclassics':
-        Bcurv[:, 0] = sys.Bfjit[0][0](kx=kx_in_path, ky=ky_in_path)
-        Bcurv[:, 1] = sys.Bfjit[1][1](kx=kx_in_path, ky=ky_in_path)
+        Bcurv[:, 0] = sys.B_jit[0][0](kx=kx_in_path, ky=ky_in_path)
+        Bcurv[:, 1] = sys.B_jit[1][1](kx=kx_in_path, ky=ky_in_path)
 
     symmetric_insulator = P.symmetric_insulator
     dm_dynamics_method = P.dm_dynamics_method
+
     @conditional_njit(P.type_complex_np)
-    def current_exact_path_length(solution, E_field, A_field):
+    def current_exact_path_length(solution, E_field, _A_field):
         '''
         Parameters:
         -----------
@@ -469,7 +470,7 @@ def make_current_exact_path_length(path, P, sys):
 
     if P.save_full:
         @conditional_njit(P.type_complex_np)
-        def current_exact_path_length(solution, E_field, A_field, j_k_E_dir_path, j_k_ortho_path):
+        def current_exact_path_length(solution, E_field, _A_field, j_k_E_dir_path, j_k_ortho_path):
             '''
             Parameters:
             -----------
@@ -514,8 +515,9 @@ def make_current_exact_path_length(path, P, sys):
 
                 if dm_dynamics_method == 'semiclassics':
                     # '-' because there is q^2 compared to q only at the SBE current
-                    j_k_ortho_path[i_k] = - E_field * Bcurv[i_k, 0].real * rho_vv[i_k].real \
-                                          - E_field * Bcurv[i_k, 1].real * rho_vc[i_k].real
+                    j_k_ortho_path[i_k] =\
+                        - E_field * Bcurv[i_k, 0].real * rho_vv[i_k].real \
+                        - E_field * Bcurv[i_k, 1].real * rho_vc[i_k].real
 
             return np.sum(j_k_E_dir_path), np.sum(j_k_ortho_path)
 

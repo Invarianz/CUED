@@ -11,11 +11,5 @@ def model():
 
     return dirac_system
 
-def run(system):
-
-    sbe_solver(system, params)
-
-    return 0
-
 if __name__ == "__main__":
-    run(model())
+    sbe_solver(model(), params)

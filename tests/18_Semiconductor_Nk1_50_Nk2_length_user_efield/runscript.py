@@ -33,16 +33,13 @@ def model():
     muz = 0.033
 
     semich_bite_system = Semiconductor(A=A, mz=muz, mx=mx, a=8.28834, nature=True)
+    semich_bite_system.make_eigensystem()
+
     return semich_bite_system
 
-
-def run(system):
-
+if __name__ == "__main__":
     E0 = 1e-1  # MV/cm
     sigma = 20 # fs
     params.electric_field_function = make_gaussian(E0, sigma)
-    sbe_solver(system, params)
 
-
-if __name__ == "__main__":
-    run(model())
+    sbe_solver(model(), params)
