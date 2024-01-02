@@ -117,13 +117,13 @@ class TwoBandHamiltonianSystem():
 
         def up_gauge():
             wfv = sp.Matrix([sp.Add(self.hz, -self.e_soc),
-                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+                             sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
             wfc = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                                sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
+                             sp.Add(self.hx, sp.Mul(sp.I, self.hy))])
             wfv_h = sp.Matrix([sp.Add(self.hz, -self.e_soc),
-                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+                               sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
             wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
-                                  sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
+                               sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
             normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
             normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
 
@@ -131,13 +131,13 @@ class TwoBandHamiltonianSystem():
 
         def down_gauge():
             wfv = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
-                                sp.Add(self.hz, self.e_soc)])
+                             sp.Add(self.hz, self.e_soc)])
             wfc = sp.Matrix([sp.Add(-self.hx, sp.Mul(sp.I, self.hy)),
-                                sp.Add(self.hz, self.e_soc)])
+                             sp.Add(self.hz, -self.e_soc)])
             wfv_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
-                                  sp.Add(self.hz, self.e_soc)])
+                               sp.Add(self.hz, self.e_soc)])
             wfc_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
-                                  sp.Add(self.hz, -self.e_soc)])
+                               sp.Add(self.hz, -self.e_soc)])
             normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
             normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
 

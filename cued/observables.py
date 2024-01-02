@@ -150,10 +150,10 @@ def make_current_path(path, P, sys):
         e_deriv_E_dir_c = np.empty(pathlen, dtype=type_real_np)
         e_deriv_ortho_c = np.empty(pathlen, dtype=type_real_np)
 
-        if gauge == 'length':
-            kx_shift = 0
-            ky_shift = 0
-            rho_vv_subs = 0
+        # if gauge == 'length':
+        kx_shift = float(0)
+        ky_shift = float(0)
+        rho_vv_subs = float(0)
         if gauge == 'velocity':
             kx_shift = A_field*E_dir[0]
             ky_shift = A_field*E_dir[1]
