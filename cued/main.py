@@ -167,18 +167,9 @@ def run_sbe(
     # Make containers for time- and frequency- dependent observables
     T = TimeContainers(P)
     W = FrequencyContainers()
-    sys.make_eigensystem_jit()
 
-    # Make rhs of ode for 2band; returns 0 for series expansion
-#    sys.eigensystem_dipole_path(
-#        P.paths[0],
-#        P.E_dir,
-#        P.E_ort,
-#        P.bands,
-#        P.dm_dynamics_method,
-#        P.type_real_np,
-#        P.type_complex_np
-#    )
+    # Compile symbolic expressions to functions
+    sys.make_eigensystem_jit(P.type_complex_np)
 
     rhs_ode, solver = make_rhs_ode(P, T, sys)
 
@@ -641,9 +632,9 @@ def first_order(y_mat, time_integral, y0_mat, t, E_field, A_field, e_in_path, di
 
     for i in range(n):
         for j in range(n):
-            time_integral[:, i, j] += np.exp(t * (1j * (e_in_path[:, i] - e_in_path[:, j]) + 1/T2)) * E_field * dipole_in_path[:, i, j] * dt
+            time_integral[:, i, j] += np.exp(t * (1j * (e_in_path[i, :] - e_in_path[j, :]) + 1/T2)) * E_field * dipole_in_path[i, j, :] * dt
             if i != j:
-                y_mat[:, i, j] -= 1j * time_integral[:, i, j] * (y0_mat[:, i, i] - y0_mat[:, j, j]) * np.exp( - t * ( 1j * ( e_in_path[:, i] - e_in_path[:, j] ) + 1/T2  ) )
+                y_mat[:, i, j] -= 1j * time_integral[:, i, j] * (y0_mat[:, i, i] - y0_mat[:, j, j]) * np.exp( - t * ( 1j * ( e_in_path[i, :] - e_in_path[j, :] ) + 1/T2  ) )
 
     return y_mat, time_integral
 
@@ -654,7 +645,7 @@ def first_order_high_damping(y_mat, y0_mat, t, E_field, e_in_path, dipole_in_pat
         for j in range(n):
             if i!= j:
                 y_mat[:, i, j] -= 1j * T2 * ( y0_mat[:, i, i] - y0_mat[:, j, j] ) \
-                                  * E_field * dipole_in_path[:, i, j] 
+                                  * E_field * dipole_in_path[i, j, :] 
 
     return y_mat
 
@@ -664,7 +655,7 @@ def second_order_high_damping(y_mat, time_integral, y0_mat, E_field, dipole_in_p
     for i in range(n):
         for k in range(n):
             for nk in range(Nk1):
-                time_integral[nk, i, k] += np.abs(E_field * dipole_in_path[nk, k, i])**2 * dt
+                time_integral[nk, i, k] += np.abs(E_field * dipole_in_path[k, i, nk])**2 * dt
                 y_mat[nk, i, i] -= T2 * ( y0_mat[nk, i, i] - y0_mat[nk, k, k] ) * time_integral[nk, i, k]
 
     return y_mat, time_integral
@@ -675,8 +666,8 @@ def first_order_taylor(y_mat, y0_mat, t, E_field, A_field, dipole_in_path, e_in_
     for i in range(n):
         for j in range(n):
             # first order of taylor expansion
-            y_mat[:, i, j] -= 1j / (1/T2 + 1j*( e_in_path[:, i] - e_in_path[:, j] )) * ( y0_mat[:, i, i] - y0_mat[:, j, j] ) \
-                * E_field * dipole_in_path[:, i, j] #* np.exp(1j * t * ( e_in_path[:, i] - e_in_path[:, j] ) ) \
+            y_mat[:, i, j] -= 1j / (1/T2 + 1j*( e_in_path[i, :] - e_in_path[j, :] )) * ( y0_mat[:, i, i] - y0_mat[:, j, j] ) \
+                * E_field * dipole_in_path[i, j, :] #* np.exp(1j * t * ( e_in_path[:, i] - e_in_path[:, j] ) ) \
                 
 
             # first order of taylor expansion
@@ -710,16 +701,17 @@ def initial_condition(
     Occupy conduction band according to inital Fermi energy and temperature
     If length gauge calculate distribution, if velocity gauge leave empty.
     '''
-    num_kpoints = e_in_path.shape[0]
-    num_bands = e_in_path.shape[1]
+    num_bands = e_in_path.shape[0]
+    num_kpoints = e_in_path.shape[1]
+
     distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
     initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
                                  dtype=P.type_complex_np)
     # if P.gauge == 'length':
     if P.temperature > 1e-5:
-        distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
+        distrib_bands += 1/(np.exp((e_in_path.T - P.e_fermi)/P.temperature) + 1)
     else:
-        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
+        smaller_e_fermi = (P.e_fermi - e_in_path.T) > 0
         distrib_bands[smaller_e_fermi] += 1
 
     for k in range(num_kpoints):

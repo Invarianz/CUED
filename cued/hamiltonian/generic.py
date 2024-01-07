@@ -71,16 +71,6 @@ class TwoBandHamiltonianSystem():
         
         self.B_jit = None
 
-        # Evaluated fields
-        self.Ax_eval = None
-        self.Ay_eval = None
-
-        self.B_eval = None
-
-        # Assign when evaluate_energy is called
-        self.e_eval = None
-        self.ederiv_eval = None
-
         self.e_in_path = None   #set when eigensystem_dipole_path is called
 
         self.dipole_path_x = None
@@ -286,11 +276,11 @@ class TwoBandHamiltonianSystem():
         kx_in_path = path[:, 0]
         ky_in_path = path[:, 1]
         pathlen = path[:,0].size
-        self.e_in_path = np.zeros([pathlen, bands], dtype=dtype_real)
+        self.e_in_path = np.zeros([bands, pathlen], dtype=dtype_real)
 
         if dynamics_method == 'semiclassics':
-            self.dipole_path_x = np.zeros([pathlen, bands, bands], dtype=dtype_complex)
-            self.dipole_path_y = np.zeros([pathlen, bands, bands], dtype=dtype_complex)
+            self.dipole_path_x = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
+            self.dipole_path_y = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
             self.Ax_path = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
             self.Ay_path = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
             self.Bcurv = evaluate_njit_matrix(self.B_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
@@ -301,7 +291,7 @@ class TwoBandHamiltonianSystem():
 
         # Evaluate energies for each band
         for n, e_jit in enumerate(self.e_jit):
-            self.e_in_path[:, n] = e_jit(kx=kx_in_path, ky=ky_in_path)
+            self.e_in_path[n, :] = e_jit(kx=kx_in_path, ky=ky_in_path)
 
         self.dipole_in_path = E_dir[0]*self.dipole_path_x + E_dir[1]*self.dipole_path_y
         self.dipole_ortho = E_ort[0]*self.dipole_path_x + E_ort[1]*self.dipole_path_y
@@ -335,15 +325,12 @@ class TwoBandHamiltonianSystem():
         kx: np.ndarray,
         ky: np.ndarray,
         **fkwargs
-    ) -> List:
-        '''
-        
-        '''
-        self.ederiv_eval = []
+    ) -> List[np.ndarray]:
+        ederiv_eval = []
         # Evaluate all kpoints without BZ
         for ederiv_jit in self.ederiv_jit:
-            self.ederiv_eval.append(ederiv_jit(kx=kx, ky=ky, **fkwargs))
-        return self.ederiv_eval
+            ederiv_eval.append(ederiv_jit(kx=kx, ky=ky, **fkwargs))
+        return ederiv_eval
 
     def evaluate_dipole(self, kx, ky, **fkwargs):
         """
@@ -359,13 +346,11 @@ class TwoBandHamiltonianSystem():
             keyword arguments passed to the symbolic expression
         """
         # Evaluate all kpoints without BZ
-        self.Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, **fkwargs)
-        self.Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, **fkwargs)
-        return self.Ax_eval, self.Ay_eval
+        Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, **fkwargs)
+        Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, **fkwargs)
+        return Ax_eval, Ay_eval
 
     def evaluate_curvature(self, kx, ky, **fkwargs):
         # Evaluate all kpoints without BZ
 
-        self.B_eval = evaluate_njit_matrix(self.B_jit, kx, ky, **fkwargs)
-
-        return self.B_eval
+        return evaluate_njit_matrix(self.B_jit, kx, ky, **fkwargs)

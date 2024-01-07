@@ -86,10 +86,26 @@ def evaluate_njit_matrix(
     **fkwargs
 ):
     shp = np.shape(mjit)
-    numpy_matrix = np.empty((np.size(kx),) + shp, dtype=dtype)
+    numpy_matrix = np.empty(shp + (np.size(kx),), dtype=dtype)
 
     for r in range(shp[0]):
         for c in range(shp[1]):
-            numpy_matrix[:, r, c] = mjit[r][c](kx=kx, ky=ky, **fkwargs)
+            numpy_matrix[r, c, :] = mjit[r][c](kx=kx, ky=ky, **fkwargs)
 
     return numpy_matrix
+
+# def evaluate_njit_list(
+#     ljit, 
+#     kx: np.ndarray = np.empty(1),
+#     ky: np.ndarray = np.empty(1),
+#     dtype: type = np.cdouble,
+#     **fkwargs
+# ):
+#      = np.shape(mjit)
+#     numpy_list = np.empty((np.size(kx),) + shp, dtype=dtype)
+# 
+#     for i in range(shp[0]):
+#         numpy_list[:, i] = mjit[i](kx=kx, ky=ky, **fkwargs)
+# 
+#     return numpy_list
+# 

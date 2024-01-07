@@ -49,8 +49,6 @@ def make_rhs_ode_2_band(
     E_dir = P.E_dir
     gauge = P.gauge
 
-    sys.make_eigensystem_jit(type_complex_np)
-
     # Wire the energies
     evf = sys.e_jit[0]
     ecf = sys.e_jit[1]
@@ -121,14 +119,14 @@ def make_rhs_ode_2_band(
                 right4 = 4*0
 
             # Energy gap e_2(k) - e_1(k) >= 0 at point k
-            ecv = e_in_path[k, 1] - e_in_path[k, 0]
+            ecv = e_in_path[1, k] - e_in_path[0, k]
 
             # Berry connection
-            A_in_path = dipole_in_path[k, 0, 0] - dipole_in_path[k, 1, 1]
+            A_in_path = dipole_in_path[0, 0, k] - dipole_in_path[1, 1, k]
 
             # Rabi frequency: w_R = q*d_12(k)*E(t)
             # Rabi frequency conjugate: w_R_c = q*d_21(k)*E(t)
-            wr = dipole_in_path[k, 0, 1]*electric_f
+            wr = dipole_in_path[0, 1, k]*electric_f
             wr_c = wr.conjugate()
 
             # Rabi frequency: w_R = q*(d_11(k) - d_22(k))*E(t)
@@ -205,7 +203,7 @@ def make_rhs_ode_2_band(
         is shifted according to the vector potential A
         """
 
-        ecv_in_path, dipole_in_path[:, 0, 1], A_in_path = pre_velocity(kpath, y[-1].real)
+        ecv_in_path, dipole_in_path[0, 1, :], A_in_path = pre_velocity(kpath, y[-1].real)
         # x != y(t+dt)
         x = np.empty(np.shape(y), dtype=type_complex_np)
 
@@ -220,7 +218,7 @@ def make_rhs_ode_2_band(
 
             # Rabi frequency: w_R = d_12(k).E(t)
             # Rabi frequency conjugate
-            wr = dipole_in_path[k, 0, 1]*electric_f
+            wr = dipole_in_path[0, 1, k]*electric_f
             wr_c = wr.conjugate()
 
             # Rabi frequency: w_R = (d_11(k) - d_22(k))*E(t)
