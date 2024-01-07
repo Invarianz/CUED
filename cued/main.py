@@ -170,15 +170,15 @@ def run_sbe(
     sys.make_eigensystem_jit()
 
     # Make rhs of ode for 2band; returns 0 for series expansion
-    sys.eigensystem_dipole_path(
-        P.paths[0],
-        P.E_dir,
-        P.E_ort,
-        P.bands,
-        P.dm_dynamics_method,
-        P.type_real_np,
-        P.type_complex_np
-    )
+#    sys.eigensystem_dipole_path(
+#        P.paths[0],
+#        P.E_dir,
+#        P.E_ort,
+#        P.bands,
+#        P.dm_dynamics_method,
+#        P.type_real_np,
+#        P.type_complex_np
+#    )
 
     rhs_ode, solver = make_rhs_ode(P, T, sys)
 

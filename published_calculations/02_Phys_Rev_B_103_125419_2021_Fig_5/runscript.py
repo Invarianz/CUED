@@ -14,14 +14,9 @@ def model():
     params.length_BZ_E_dir = 2*np.pi/a
 
     semiconductor_system = TwoSiteSemiconductor(lattice_const=a, hopping=t, onsite_energy_difference=m)
+    semiconductor_system.make_eigensystem()
 
     return semiconductor_system
 
-def run(system):
-
-    sbe_solver(system, params)
-
-    return 0
-
 if __name__ == "__main__":
-    run(model())
+    sbe_solver(model(), params)

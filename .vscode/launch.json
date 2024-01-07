@@ -16,13 +16,22 @@
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tests/test_script.py",
-            "args": ["--path", "tests", "--mpin", "6"]
+            "args": ["--path", "published_calculations", "--mpin", "8"],
+            "env": {"PYTHONPATH": "${workspaceFolder}"}
         },
         {
             "name": "01_Dirac_Nk1_2_Nk2_2_velocity",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tests/01_Dirac_Nk1_2_Nk2_2_velocity/runscript.py",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "03_Dirac_Nk1_50_Nk2_4_length",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/03_Dirac_Nk1_50_Nk2_4_length/runscript.py",
+            "env": {"PYTHONPATH": "${workspaceFolder}"},
             "console": "integratedTerminal"
         },
         {

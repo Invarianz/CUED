@@ -110,8 +110,19 @@ class TwoBandHamiltonianSystem():
                                sp.Add(self.hz, self.e_soc)])
             wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
                                sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
-            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
-            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            # Analytical norms
+            # Equals normc_sq
+            normv_sq = sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc) 
+
+            normv = sp.sqrt(normv_sq)
+            normc = sp.sqrt(normv_sq)
+
+            # SymPy calculated norms
+            # normv_sq = wfv_h.dot(wfv)
+            # normc_sq = wfc_h.dot(wfc)
+
+            # normv = sp.sqrt(normv_sq)
+            # normc = sp.sqrt(normc_sq)
 
             return wfv, wfc, wfv_h, wfc_h, normv, normc
 
@@ -124,8 +135,19 @@ class TwoBandHamiltonianSystem():
                                sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
             wfc_h = sp.Matrix([sp.Add(self.hz, self.e_soc),
                                sp.Add(self.hx, -sp.Mul(sp.I, self.hy))])
-            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
-            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            # Analytical norms
+            # normv_sq = sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc)
+            # normc_sq = sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc)
+
+            # normv = sp.sqrt(normv_sq)
+            # normc = sp.sqrt(normc_sq)
+
+            # SymPy calculated norms
+            normv_sq = wfv_h.dot(wfv)
+            normc_sq = wfc_h.dot(wfc)
+
+            normv = sp.sqrt(normv_sq)
+            normc = sp.sqrt(normc_sq)
 
             return wfv, wfc, wfv_h, wfc_h, normv, normc
 
@@ -138,23 +160,34 @@ class TwoBandHamiltonianSystem():
                                sp.Add(self.hz, self.e_soc)])
             wfc_h = sp.Matrix([sp.Add(-self.hx, -sp.Mul(sp.I, self.hy)),
                                sp.Add(self.hz, -self.e_soc)])
-            normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
-            normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
+            # Analytical norms
+            # normv_sq = sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc)
+            # normc_sq = sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc)
+
+            # normv = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, self.hz), self.e_soc))
+            # normc = sp.sqrt(sp.Mul(2, sp.Add(self.e_soc, -self.hz), self.e_soc))
+
+            # SymPy calculated norms
+            normv_sq = wfv_h.dot(wfv)
+            normc_sq = wfc_h.dot(wfc)
+
+            normv = sp.sqrt(normv_sq)
+            normc = sp.sqrt(normc_sq)
 
             return wfv, wfc, wfv_h, wfc_h, normv, normc
 
         def mixed_gauge(gidx):
-            wfv_up, wfc_up, wfv_up_h, wfc_up_h, _normv_up, _normc_up =\
-                up_gauge()
-            wfv_do, wfc_do, wfv_do_h, wfc_do_h, _normv_do, _normc_do =\
-                down_gauge()
+            wfv_up, wfc_up, wfv_up_h, wfc_up_h, _, _ = up_gauge()
+            wfv_do, wfc_do, wfv_do_h, wfc_do_h, _, _ = down_gauge()
 
             wfv = (1-gidx)*wfv_up + gidx*wfv_do
             wfc = (1-gidx)*wfc_up + gidx*wfc_do
             wfv_h = (1-gidx)*wfv_up_h + gidx*wfv_do_h
             wfc_h = (1-gidx)*wfc_up_h + gidx*wfc_do_h
-            normv = sp.sqrt(wfv_h.dot(wfv))
-            normc = sp.sqrt(wfc_h.dot(wfc))
+            normv_sq = wfv_h.dot(wfv)
+            normc_sq = wfc_h.dot(wfc)
+            normv = sp.sqrt(normv_sq)
+            normc = sp.sqrt(normc_sq)
 
             return wfv, wfc, wfv_h, wfc_h, normv, normc
 
@@ -171,9 +204,6 @@ class TwoBandHamiltonianSystem():
 
         self.U = (wfv/normv).row_join(wfc/normc)
         self.U_h = (wfv_h/normv).T.col_join((wfc_h/normc).T)
-
-        self.U_no_norm = (wfv).row_join(wfc)
-        self.U_h_no_norm = (wfv_h).T.col_join(wfc_h.T)
 
         # Create Berry connection
         # Minus sign is the charge
