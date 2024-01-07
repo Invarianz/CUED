@@ -1,10 +1,10 @@
 import numpy as np
 import sympy as sp
 
-from typing import cast, List, Optional, Union
+from typing import cast, List, Optional, Tuple, Union
 
 from cued.utility.njit import (list_to_njit_functions, matrix_to_njit_functions,
-                               evaluate_njit_matrix)
+                               evaluate_njit_list, evaluate_njit_matrix)
 
 class TwoBandHamiltonianSystem():
     so = sp.Matrix([[1, 0], [0, 1]])
@@ -275,8 +275,7 @@ class TwoBandHamiltonianSystem():
         # Retrieve the set of k-points for the current path
         kx_in_path = path[:, 0]
         ky_in_path = path[:, 1]
-        pathlen = path[:,0].size
-        self.e_in_path = np.zeros([bands, pathlen], dtype=dtype_real)
+        pathlen = path[:, 0].size
 
         if dynamics_method == 'semiclassics':
             self.dipole_path_x = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
@@ -290,8 +289,7 @@ class TwoBandHamiltonianSystem():
             self.dipole_path_y = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
 
         # Evaluate energies for each band
-        for n, e_jit in enumerate(self.e_jit):
-            self.e_in_path[n, :] = e_jit(kx=kx_in_path, ky=ky_in_path)
+        self.e_in_path = evaluate_njit_list(self.e_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_real)
 
         self.dipole_in_path = E_dir[0]*self.dipole_path_x + E_dir[1]*self.dipole_path_y
         self.dipole_ortho = E_ort[0]*self.dipole_path_x + E_ort[1]*self.dipole_path_y
@@ -309,48 +307,47 @@ class TwoBandHamiltonianSystem():
         self,
         kx: np.ndarray,
         ky: np.ndarray,
+        dtype=np.double,
         **fkwargs
-    ) -> List:
+    ) -> np.ndarray:
         '''
         Evaluate energy bands at all give k-points
         '''
-        self.e_eval = []
-
-        for e_jit in self.e_jit:
-            self.e_eval.append(e_jit(kx=kx, ky=ky, **fkwargs))
-        return self.e_eval
+        return evaluate_njit_list(self.e_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
 
     def evaluate_ederivative(
         self,
         kx: np.ndarray,
         ky: np.ndarray,
+        dtype=np.double,
         **fkwargs
-    ) -> List[np.ndarray]:
-        ederiv_eval = []
-        # Evaluate all kpoints without BZ
-        for ederiv_jit in self.ederiv_jit:
-            ederiv_eval.append(ederiv_jit(kx=kx, ky=ky, **fkwargs))
-        return ederiv_eval
+    ) -> np.ndarray:
+        return evaluate_njit_list(self.ederiv_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
 
-    def evaluate_dipole(self, kx, ky, **fkwargs):
+    def evaluate_dipole(
+        self,
+        kx: np.ndarray,
+        ky: np.ndarray,
+        dtype=np.cdouble,
+        **fkwargs
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Transforms the symbolic expression for the
         berry connection/dipole moment matrix to an expression
         that is numerically evaluated.
 
-        Parameters
-        ----------
-        kx, ky : np.ndarray
-            array of all point combinations
-        fkwargs :
-            keyword arguments passed to the symbolic expression
         """
         # Evaluate all kpoints without BZ
-        Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, **fkwargs)
-        Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, **fkwargs)
+        Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, dtype=dtype, **fkwargs)
+        Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, dtype=dtype, **fkwargs)
         return Ax_eval, Ay_eval
 
-    def evaluate_curvature(self, kx, ky, **fkwargs):
+    def evaluate_curvature(
+        self,
+        kx: np.ndarray,
+        ky: np.ndarray,
+        dtype=np.cdouble,
+        **fkwargs
+    ) -> np.ndarray:
         # Evaluate all kpoints without BZ
-
-        return evaluate_njit_matrix(self.B_jit, kx, ky, **fkwargs)
+        return evaluate_njit_matrix(self.B_jit, kx, ky, dtype=dtype, **fkwargs)

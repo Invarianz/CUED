@@ -78,6 +78,21 @@ def __to_njit_function_k(
         return lambdify(list(hsymbols), sf, np)
     return njit(lambdify(list(hsymbols), sf, np))
 
+def evaluate_njit_list(
+    ljit, 
+    kx: np.ndarray = np.empty(1),
+    ky: np.ndarray = np.empty(1),
+    dtype: type = np.cdouble,
+    **fkwargs
+):
+    n = len(ljit)
+    numpy_arr = np.empty((n, np.size(kx)), dtype=dtype)
+
+    for i in range(n):
+        numpy_arr[i, :] = ljit[i](kx=kx, ky=ky, **fkwargs)
+
+    return numpy_arr
+
 def evaluate_njit_matrix(
     mjit, 
     kx: np.ndarray = np.empty(1),
@@ -93,19 +108,3 @@ def evaluate_njit_matrix(
             numpy_matrix[r, c, :] = mjit[r][c](kx=kx, ky=ky, **fkwargs)
 
     return numpy_matrix
-
-# def evaluate_njit_list(
-#     ljit, 
-#     kx: np.ndarray = np.empty(1),
-#     ky: np.ndarray = np.empty(1),
-#     dtype: type = np.cdouble,
-#     **fkwargs
-# ):
-#      = np.shape(mjit)
-#     numpy_list = np.empty((np.size(kx),) + shp, dtype=dtype)
-# 
-#     for i in range(shp[0]):
-#         numpy_list[:, i] = mjit[i](kx=kx, ky=ky, **fkwargs)
-# 
-#     return numpy_list
-# 

@@ -298,12 +298,14 @@ def make_BZ(
             P.E_dir = np.array([1, 0], P.type_real_np)
         elif P.align == 'M':
             P.E_dir = np.array([np.cos(np.radians(-30)),
-                                np.sin(np.radians(-30))], dtype=P.type_real_np)
+                                np.sin(np.radians(-30))],
+                                dtype=P.type_real_np)
         P.dk, P.kweight, P.paths, P.mesh = hex_mesh(P)
 
     elif P.BZ_type == 'rectangle':
         P.E_dir = np.array([np.cos(np.radians(P.angle_inc_E_field)),
-                            np.sin(np.radians(P.angle_inc_E_field))], dtype=P.type_real_np)
+                            np.sin(np.radians(P.angle_inc_E_field))],
+                            dtype=P.type_real_np)
         P.dk, P.kweight, P.paths, P.mesh = rect_mesh(P)
 
     P.E_ort = np.array([P.E_dir[1], -P.E_dir[0]])
@@ -315,7 +317,7 @@ def make_BZ(
         Nk2_buf = np.copy(P.Nk2)
         paths_buf = np.copy(P.paths)
 
-        P.paths = np.empty((Nk1_buf*Nk2_buf, 1, 2))
+        P.paths = np.empty((Nk1_buf*Nk2_buf, 1, 2), dtype=P.type_real_np)
         for i in range(Nk2_buf):
             for j in range(Nk1_buf):
                 P.paths[Nk1_buf*i + j, 0, 0] = paths_buf[i, j, 0]
