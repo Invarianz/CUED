@@ -14,12 +14,9 @@ def model():
     kasym = 0.113773                  # k^3 coeffcient dampening
 
     dft_system = BiTeFit(C0=C0, c2=c2, A=A, r=r, ksym=ksym, kasym=kasym)
+    dft_system.make_eigensystem()
 
     return dft_system
 
-def run(system):
-
-    sbe_solver(system, params)
-
 if __name__ == "__main__":
-    run(model())
+    sbe_solver(model(), params)

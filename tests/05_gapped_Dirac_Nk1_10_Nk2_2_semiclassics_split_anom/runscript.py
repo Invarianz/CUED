@@ -8,14 +8,10 @@ def model():
     mz = 0.01837     # prefactor of sigma_z in Hamiltonian
 
     dirac_system = BiTe(C0=0, C2=0, A=A, R=0, mz=mz)
+    dirac_system.make_eigensystem()
 
     return dirac_system
 
-def run(system):
-
-    sbe_solver(system, params)
-
-    return 0
-
 if __name__ == "__main__":
-    run(model())
+
+    sbe_solver(model(), params)

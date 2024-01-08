@@ -6,11 +6,9 @@ from cued.main import sbe_solver
 def model():
     t = 0.08                 #t coefficient
     dft_system = Graphene(a=params.a, t=t)
+    dft_system.make_eigensystem()
+
     return dft_system
 
-def run(system):
-    sbe_solver(system, params)
-    return 0
-
 if __name__ == "__main__":
-    run(model())
+    sbe_solver(model(), params)
