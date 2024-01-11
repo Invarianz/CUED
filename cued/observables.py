@@ -403,9 +403,9 @@ def make_current_exact_path_length(path, P, sys):
     U_h = evaluate_njit_matrix(sys.U_h_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
     if P.dm_dynamics_method == 'semiclassics':
-        Bcurv = np.empty((pathlen, 2), dtype=P.type_complex_np)
-        Bcurv[:, 0] = sys.B_jit[0][0](kx=kx_in_path, ky=ky_in_path)
-        Bcurv[:, 1] = sys.B_jit[1][1](kx=kx_in_path, ky=ky_in_path)
+        Bcurv = np.empty((2, pathlen), dtype=P.type_complex_np)
+        Bcurv[0, :] = sys.B_jit[0][0](kx=kx_in_path, ky=ky_in_path)
+        Bcurv[1, :] = sys.B_jit[1][1](kx=kx_in_path, ky=ky_in_path)
 
     symmetric_insulator = P.symmetric_insulator
     dm_dynamics_method = P.dm_dynamics_method

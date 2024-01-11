@@ -706,23 +706,23 @@ def initial_condition(
     num_bands = e_in_path.shape[0]
     num_kpoints = e_in_path.shape[1]
 
-    distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
-    initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
+    distrib_bands = np.zeros([num_bands, num_kpoints], dtype=P.type_complex_np)
+    initial_condition = np.zeros([num_bands, num_bands, num_kpoints],
                                  dtype=P.type_complex_np)
     # if P.gauge == 'length':
     if P.temperature > 1e-5:
-        distrib_bands += 1/(np.exp((e_in_path.T - P.e_fermi)/P.temperature) + 1)
+        distrib_bands += 1/(np.exp((e_in_path - P.e_fermi)/P.temperature) + 1)
     else:
-        smaller_e_fermi = (P.e_fermi - e_in_path.T) > 0
+        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
         distrib_bands[smaller_e_fermi] += 1
 
     for k in range(num_kpoints):
-        initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
+        initial_condition[:, :, k] = np.diag(distrib_bands[:, k])
     #elif P.gauge == 'velocity':
     #    # Keep initial condition empty as container
     #    # In the velocity gauge it needs to be calculated for every k-shift
     #    pass
-    return initial_condition.flatten('C')
+    return initial_condition.flatten('F')
 
 
 def diff(x, y):
