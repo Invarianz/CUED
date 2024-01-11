@@ -200,7 +200,12 @@ def run_sbe(
 
         # Initialize the values of of each k point vector
         # In the velocity gauge this is an empty container
-        y0 = initial_condition(P, sys.e_in_path)
+        y0 = initial_condition(
+                 sys.evaluate_energy(kx=path[:, 0], ky=path[:, 1]),
+                 P.e_fermi,
+                 P.temperature,
+                 P.type_complex_np
+             )
         # Append empty container for A_field
         y0 = np.append(y0, [0.0])
 
@@ -696,24 +701,26 @@ def second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, dipole_i
     return y_mat, time_integral
 
 def initial_condition(
-    P,
-    e_in_path
+    energies: np.ndarray,
+    e_fermi: float,
+    temperature: float,
+    dtype: type
 ) -> np.ndarray:
     '''
     Occupy conduction band according to inital Fermi energy and temperature
     If length gauge calculate distribution, if velocity gauge leave empty.
     '''
-    num_bands = e_in_path.shape[0]
-    num_kpoints = e_in_path.shape[1]
+    num_bands = energies.shape[0]
+    num_kpoints = energies.shape[1]
 
-    distrib_bands = np.zeros([num_bands, num_kpoints], dtype=P.type_complex_np)
+    distrib_bands = np.zeros([num_bands, num_kpoints], dtype=dtype)
     initial_condition = np.zeros([num_bands, num_bands, num_kpoints],
-                                 dtype=P.type_complex_np)
+                                 dtype=dtype)
     # if P.gauge == 'length':
-    if P.temperature > 1e-5:
-        distrib_bands += 1/(np.exp((e_in_path - P.e_fermi)/P.temperature) + 1)
+    if temperature > 1e-5:
+        distrib_bands += 1/(np.exp((energies - e_fermi)/temperature) + 1)
     else:
-        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
+        smaller_e_fermi = (e_fermi - energies) > 0
         distrib_bands[smaller_e_fermi] += 1
 
     for k in range(num_kpoints):

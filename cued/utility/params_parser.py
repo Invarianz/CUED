@@ -347,8 +347,8 @@ class ParamsParser():
 
         # Derived precision parameters
         if self.precision == 'double':
-            self.type_real_np = np.float64
-            self.type_complex_np = np.complex128
+            self.type_real_np = np.double
+            self.type_complex_np = np.cdouble
         elif self.precision == 'quadruple':
             self.type_real_np = np.longdouble
             self.type_complex_np = np.longcomplex
