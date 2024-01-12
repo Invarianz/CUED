@@ -261,48 +261,6 @@ class TwoBandHamiltonianSystem():
         self.B_jit =\
             matrix_to_njit_functions(self.B, self.h.free_symbols, dtype=dtype)
 
-    def eigensystem_dipole_path(
-        self,
-        path,
-        E_dir,
-        E_ort,
-        bands,
-        dynamics_method,
-        dtype_real,
-        dtype_complex
-    ):
-
-        # Retrieve the set of k-points for the current path
-        kx_in_path = path[:, 0]
-        ky_in_path = path[:, 1]
-        pathlen = path[:, 0].size
-
-        if dynamics_method == 'semiclassics':
-            self.dipole_path_x = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
-            self.dipole_path_y = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
-            self.Ax_path = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-            self.Ay_path = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-            self.Bcurv = evaluate_njit_matrix(self.B_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-        else:
-            # Calculate the dipole components along the path
-            self.dipole_path_x = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-            self.dipole_path_y = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-
-        # Evaluate energies for each band
-        self.e_in_path = evaluate_njit_list(self.e_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_real)
-
-        self.dipole_in_path = E_dir[0]*self.dipole_path_x + E_dir[1]*self.dipole_path_y
-        self.dipole_ortho = E_ort[0]*self.dipole_path_x + E_ort[1]*self.dipole_path_y
-
-        if dynamics_method == 'EEA':
-            self.dipole_derivative_in_path = evaluate_njit_matrix(self.dipole_derivative_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
-
-#        if P.dm_dynamics_method == 'EEA':
-#            self.dipole_derivative = P.E_dir[0] * P.E_dir[0] * sp.diff(self.Ax, self.kx) \
-#                + P.E_dir[0] * P.E_dir[1] * (sp.diff(self.Ax, self.ky) + sp.diff(self.Ay, self.kx)) \
-#                + P.E_dir[1] * P.E_dir[1] * sp.diff(self.Ay, self.ky)
-#            self.dipole_derivative_jit = matrix_to_njit_functions(self.dipole_derivative, self.h.free_symbols, dtype=P.type_complex_np)
-
     def evaluate_energy(
         self,
         kx: np.ndarray,
@@ -324,6 +282,18 @@ class TwoBandHamiltonianSystem():
     ) -> np.ndarray:
         return evaluate_njit_list(self.ederiv_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
 
+    def evaluate_wavefunction(
+        self,
+        kx: np.ndarray,
+        ky: np.ndarray,
+        dtype=np.cdouble,
+        **fkwargs
+    ) -> Tuple[np.ndarray, np.ndarray]:
+
+        U_eval = evaluate_njit_matrix(self.U_jit, kx, ky, dtype=dtype, **fkwargs)
+        U_h_eval = evaluate_njit_matrix(self.U_h_jit, kx, ky, dtype=dtype, **fkwargs)
+        return U_eval, U_h_eval
+
     def evaluate_dipole(
         self,
         kx: np.ndarray,
@@ -331,12 +301,6 @@ class TwoBandHamiltonianSystem():
         dtype=np.cdouble,
         **fkwargs
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Transforms the symbolic expression for the
-        berry connection/dipole moment matrix to an expression
-        that is numerically evaluated.
-
-        """
         # Evaluate all kpoints without BZ
         Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, dtype=dtype, **fkwargs)
         Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, dtype=dtype, **fkwargs)
@@ -351,3 +315,47 @@ class TwoBandHamiltonianSystem():
     ) -> np.ndarray:
         # Evaluate all kpoints without BZ
         return evaluate_njit_matrix(self.B_jit, kx, ky, dtype=dtype, **fkwargs)
+
+## Calling method deprecated
+#     def eigensystem_dipole_path(
+#         self,
+#         path,
+#         E_dir,
+#         E_ort,
+#         bands,
+#         dynamics_method,
+#         dtype_real,
+#         dtype_complex
+#     ):
+# 
+#         # Retrieve the set of k-points for the current path
+#         kx_in_path = path[:, 0]
+#         ky_in_path = path[:, 1]
+#         pathlen = path[:, 0].size
+# 
+#         if dynamics_method == 'semiclassics':
+#             self.dipole_path_x = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
+#             self.dipole_path_y = np.zeros([bands, bands, pathlen], dtype=dtype_complex)
+#             self.Ax_path = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+#             self.Ay_path = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+#             self.Bcurv = evaluate_njit_matrix(self.B_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+#         else:
+#             # Calculate the dipole components along the path
+#             self.dipole_path_x = evaluate_njit_matrix(self.Ax_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+#             self.dipole_path_y = evaluate_njit_matrix(self.Ay_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+# 
+#         # Evaluate energies for each band
+#         self.e_in_path = evaluate_njit_list(self.e_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_real)
+# 
+#         self.dipole_in_path = E_dir[0]*self.dipole_path_x + E_dir[1]*self.dipole_path_y
+#         self.dipole_ortho = E_ort[0]*self.dipole_path_x + E_ort[1]*self.dipole_path_y
+# 
+#         if dynamics_method == 'EEA':
+#             self.dipole_derivative_in_path = evaluate_njit_matrix(self.dipole_derivative_jit, kx=kx_in_path, ky=ky_in_path, dtype=dtype_complex)
+# 
+# #        if P.dm_dynamics_method == 'EEA':
+# #            self.dipole_derivative = P.E_dir[0] * P.E_dir[0] * sp.diff(self.Ax, self.kx) \
+# #                + P.E_dir[0] * P.E_dir[1] * (sp.diff(self.Ax, self.ky) + sp.diff(self.Ay, self.kx)) \
+# #                + P.E_dir[1] * P.E_dir[1] * sp.diff(self.Ay, self.ky)
+# #            self.dipole_derivative_jit = matrix_to_njit_functions(self.dipole_derivative, self.h.free_symbols, dtype=P.type_complex_np)
+# 

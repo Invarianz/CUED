@@ -4,12 +4,14 @@ from itertools import product
 from numba import njit
 from numpy.fft import fftshift, fft, ifftshift, ifft, fftfreq
 from scipy.integrate import ode
+from sys import exit
 from time import perf_counter
 
 from typing import cast, Callable, OrderedDict, Tuple, Union
 
 from cued.utility.constants import au_to_fs
-from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
+from cued.utility.data_containers import (FrequencyContainers, TimeContainers,
+                                          ScreeningContainers, SystemContainers)
 from cued.utility.params_parser import ParamsParser
 from cued.utility.multicore import MpiHelpers
 from cued.utility.dir import rmdir_mkdir_chdir, chdir
@@ -19,7 +21,7 @@ from cued.kpoint_mesh import hex_mesh, rect_mesh
 from cued.observables import *
 from cued.rhs_ode import *
 
-import sys as system
+
 
 def sbe_solver(
     sys,
@@ -68,7 +70,7 @@ def sbe_solver(
             if Mpi.rank == 0:
                 print("For parallelization over paths and parameters, choose "
                         + "the number of MPI ranks from " + str(ncpu_list) )
-            system.exit()
+            exit()
 
     # Parallelize over parameters if there are more parameter combinations than paths
     elif (P.Nk2_is_list or P.num_param_combinations >= params.Nk2) and not P.parallelize_over_points:
@@ -167,11 +169,14 @@ def run_sbe(
     # Make containers for time- and frequency- dependent observables
     T = TimeContainers(P)
     W = FrequencyContainers()
+    H = SystemContainers()
 
     # Compile symbolic expressions to functions
     sys.make_eigensystem_jit(P.type_complex_np)
 
     rhs_ode, solver = make_rhs_ode(P, T, sys)
+
+    # Instance of empty system variable container
 
     ###########################################################################
     # SOLVING
@@ -183,16 +188,17 @@ def run_sbe(
         if P.user_out:
             print('Solving SBE for Path', Nk2_idx+1)
 
-        # Evaluate the dipole components along the path
-        sys.eigensystem_dipole_path(
-            path,
-            P.E_dir,
-            P.E_ort,
-            P.bands,
-            P.dm_dynamics_method,
-            P.type_real_np,
-            P.type_complex_np
-        )
+        # Evaluate all system properties along the path
+        H.energies = sys.evaluate_energy(kx=path[:, 0], ky=path[:, 1], dtype=P.type_real_np)
+        H.Ax, H.Ay = sys.evaluate_dipole(kx=path[:, 0], ky=path[:, 1], dtype=P.type_complex_np)
+
+        if P.dm_dynamics_method == 'semiclassics':
+            H.A_E_dir = np.zeros([P.bands, P.bands, P.Nk1], dtype=P.type_complex_np)
+            H.A_ortho = np.zeros([P.bands, P.bands, P.Nk1], dtype=P.type_complex_np)
+            H.Bcurv = sys.evaluate_curvature(kx=path[:, 0], ky=path[:, 1], dtype=P.type_complex_np)
+        else:
+            H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
+            H.A_ortho = H.Ax * P.E_ort[0] + H.Ay * P.E_ort[1]
 
         # Prepare calculations of observables
         current_exact_path, polarization_inter_path, current_intra_path =\
@@ -201,7 +207,7 @@ def run_sbe(
         # Initialize the values of of each k point vector
         # In the velocity gauge this is an empty container
         y0 = initial_condition(
-                 sys.evaluate_energy(kx=path[:, 0], ky=path[:, 1]),
+                 H.energies,
                  P.e_fermi,
                  P.temperature,
                  P.type_complex_np
@@ -213,9 +219,9 @@ def run_sbe(
         if P.dm_dynamics_method in ('sbe', 'semiclassics'):
             if P.solver_method in ('bdf', 'adams'):
                 solver.set_initial_value(y0, P.t0)\
-                    .set_f_params(path, sys.dipole_in_path, sys.e_in_path, y0, P.dk)
+                    .set_f_params(path, H.A_E_dir, H.energies, y0, P.dk)
             elif P.solver_method == 'rk4':
-                T.solution_y_vec[:] = y0
+                T.solution_y_vec = y0
         elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
             T.solution_y_vec = np.copy(y0)
             T.time_integral = np.zeros((P.Nk1, P.bands, P.bands),
@@ -245,7 +251,8 @@ def run_sbe(
 
                 elif P.solver_method == 'rk4':
                     T.solution_y_vec =\
-                        rk_integrate(T.t[ti], T.solution_y_vec, path, sys, y0,
+                        rk_integrate(T.t[ti], T.solution_y_vec, path,
+                                     H.A_E_dir, H.energies, y0,
                                      P.dk, P.dt, rhs_ode)
 
             elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
@@ -317,7 +324,7 @@ def make_BZ(
 
     if P.parallelize_over_points:
         if P.gauge != 'velocity':
-            system.exit('Parallelization over points can only be used with the velocity gauge')
+            exit('Parallelization over points can only be used with the velocity gauge')
         Nk1_buf = np.copy(P.Nk1)
         Nk2_buf = np.copy(P.Nk2)
         paths_buf = np.copy(P.paths)
@@ -486,17 +493,18 @@ def rk_integrate(
     t,
     y,
     kpath,
-    sys,
+    A_E_dir,
+    energies,
     y0,
     dk,
     dt,
     rhs_ode
 ):
 
-    k1 = rhs_ode(t,          y,          kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k2 = rhs_ode(t + 0.5*dt, y + 0.5*k1, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k3 = rhs_ode(t + 0.5*dt, y + 0.5*k2, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k4 = rhs_ode(t +     dt, y +     k3, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
+    k1 = rhs_ode(t,          y,          kpath, A_E_dir, energies, y0, dk)
+    k2 = rhs_ode(t + 0.5*dt, y + 0.5*k1, kpath, A_E_dir, energies, y0, dk)
+    k3 = rhs_ode(t + 0.5*dt, y + 0.5*k2, kpath, A_E_dir, energies, y0, dk)
+    k4 = rhs_ode(t +     dt, y +     k3, kpath, A_E_dir, energies, y0, dk)
 
     ynew = y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
 
@@ -904,7 +912,7 @@ def calculate_fourier(T, P, W):
 
     if P.gabor_transformation:
         if not(hasattr(P,"gabor_gaussian_center") and hasattr(P,"gabor_window_width")):
-            system.exit("Either no center(s) or width(s) were given for the invoked Gabor transformation.")
+            exit("Either no center(s) or width(s) were given for the invoked Gabor transformation.")
         W.I_E_dir_GT = []
         W.j_E_dir_GT = []
         W.I_ortho_GT = []

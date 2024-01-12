@@ -1,15 +1,28 @@
 import numpy as np
 from cued.fields import make_electric_field
 
-import cued.dipole
-from cued.utility.multicore import MpiHelpers
-from cued.utility.njit import evaluate_njit_matrix
+from typing import Optional
+
+
+class SystemContainers():
+    """
+    Empty pointers for wiring with evaluated arrays
+    """
+    def __init__(self):
+        self.energies: Optional[np.ndarray] = None
+        self.Ax: Optional[np.ndarray] = None
+        self.Ay: Optional[np.ndarray] = None
+        self.A_E_dir: Optional[np.ndarray] = None
+        self.A_ortho: Optional[np.ndarray] = None
+        self.U: Optional[np.ndarray] = None
+        self.U_h: Optional[np.ndarray] = None
+        self.Bcurv: Optional[np.ndarray] = None
 
 class TimeContainers():
     def __init__(self, P):
         self.t = np.zeros(P.Nt, dtype=P.type_real_np)
-        self.solution = np.zeros((P.Nk1, P.bands, P.bands), dtype=P.type_complex_np)
-        self.solution_y_vec = np.zeros((((P.bands)**2)*(P.Nk1)+1), dtype=P.type_complex_np)
+        self.solution = None
+        self.solution_y_vec = None
 
         if P.save_full:
             # Container for the full k-grid densities
