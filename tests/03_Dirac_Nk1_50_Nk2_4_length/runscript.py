@@ -1,3 +1,5 @@
+from timeit import default_timer as timer
+
 from params import params
 
 from cued.hamiltonian.models import BiTe
@@ -12,4 +14,7 @@ def model():
     return dirac_system
 
 if __name__ == "__main__":
+    start = timer()
     sbe_solver(model(), params)
+    end = timer()
+    print("Time taken: ", end - start, " seconds")

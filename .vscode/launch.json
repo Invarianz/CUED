@@ -35,6 +35,14 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "27_Dirac_series_expansion_second_order_Nk1_50_Nk2_4",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/27_Dirac_series_expansion_second_order_Nk1_50_Nk2_4/runscript.py",
+            "env": {"PYTHONPATH": "${workspaceFolder}"},
+            "console": "integratedTerminal"
+        },
+        {
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
