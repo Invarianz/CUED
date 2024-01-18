@@ -222,7 +222,7 @@ def run_sbe(
                     .set_f_params(path, H.A_E_dir, H.energies, y0, P.dk)
             elif P.solver_method == 'rk4':
                 T.solution_y_vec = y0
-        elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
+        elif P.dm_dynamics_method in ('series_expansion'):
             T.solution_y_vec = np.copy(y0)
             T.time_integral = np.zeros((P.Nk1, P.bands, P.bands),
                                        dtype=P.type_complex_np)
@@ -586,55 +586,42 @@ def von_neumann_series(
     # 0th order
     y_mat[:, :, :] = np.copy(y0_mat[:, :, :])
 
-    if P.dm_dynamics_method == 'EEA':       # Approximate formula for DC remnants (Int(E^2*A), needs velocity gauge to make sense for finite times!)
+    # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
+    path_after_shift = np.copy(path)
 
-        if P.first_order:
-            y_mat = first_order_taylor(y_mat, y0_mat, t, E_field, A_field, sys.dipole_in_path, sys.e_in_path, \
-                                       sys.dipole_derivative_in_path, sys.bandstructure_derivative_in_path, P.T2, P.bands)
-        if P.second_order:
-            y_mat, time_integral = second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, \
-                                                       sys.dipole_in_path, sys.dipole_derivative_in_path, P.T2, P.dt, P.bands, P.Nk1)
+    if not P.gauge == 'length' or not P.linear_response:
+        path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
+        path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
 
-    elif P.dm_dynamics_method == 'series_expansion':
-        # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
-        path_after_shift = np.copy(path)
+        H = SystemContainers()
+        H.energies = sys.evaluate_energy(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_real_np)
+        H.Ax, H.Ay = sys.evaluate_dipole(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_complex_np)
+        H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
+        H.A_ortho = H.Ax * P.E_ort[0] + H.Ay * P.E_ort[1]
 
-        if not P.gauge == 'length' or not P.linear_response:
-            path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
-            path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
+    if P.gauge == 'length' :
+        if ti == 0:
+            P.diffy0 = y0deriv(y0_mat, P.dk, P.Nk1, P.bands, P.dk_order, P.type_complex_np)
 
-            sys.eigensystem_dipole_path(
-                P.path_after_shift,
-                P.E_dir,
-                P.E_ort,
-                P.bands,
-                P.dm_dynamics_method,
-                P.type_real_np,
-                P.type_complex_np
-            )
+    if P.first_order:
+        if P.high_damping:
+            y_mat =\
+                first_order_high_damping(y_mat, y0_mat, t, E_field,
+                                         H.energies, H.A_E_dir,
+                                         P.T2, P.bands)
+        else:
+            y_mat, time_integral =\
+                first_order(y_mat, time_integral, y0_mat, t, E_field,
+                            A_field, H.energies, H.A_E_dir,
+                            P.T2, P.dt, P.bands, P.gauge, P.diffy0)
+    if P.second_order:
+        if P.high_damping:
+            y_mat, time_integral =\
+                second_order(y_mat, time_integral, y0_mat, E_field,
+                             H.A_E_dir, P.T2, P.dt, P.bands, P.Nk1)
+        else:
+            print('Warning: second order without high damping not implemented yet!')
 
-        if P.gauge == 'length' :
-            if ti == 0:
-                P.diffy0 = y0deriv(y0_mat, P.dk, P.Nk1, P.bands, P.dk_order, P.type_complex_np)
-
-        if P.first_order:
-            if P.high_damping:
-                y_mat =\
-                    first_order_high_damping(y_mat, y0_mat, t, E_field,
-                                             sys.e_in_path, sys.dipole_in_path,
-                                             P.T2, P.bands)
-            else:
-                y_mat, time_integral =\
-                    first_order(y_mat, time_integral, y0_mat, t, E_field,
-                                A_field, sys.e_in_path, sys.dipole_in_path,
-                                P.T2, P.dt, P.bands, P.gauge, P.diffy0)
-        if P.second_order:
-            if P.high_damping:
-                y_mat, time_integral =\
-                    second_order(y_mat, time_integral, y0_mat, E_field,
-                                 sys.dipole_in_path, P.T2, P.dt, P.bands, P.Nk1)
-            else:
-                print('Warning: second order without high damping not implemented yet!')
     return y_mat.flatten('C'), time_integral
 
 

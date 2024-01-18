@@ -21,8 +21,8 @@ class SystemContainers():
 class TimeContainers():
     def __init__(self, P):
         self.t = np.zeros(P.Nt, dtype=P.type_real_np)
-        self.solution = None
-        self.solution_y_vec = None
+        self.solution: Optional[np.ndarray] = None
+        self.solution_y_vec: Optional[np.ndarray] = None
 
         if P.save_full:
             # Container for the full k-grid densities
