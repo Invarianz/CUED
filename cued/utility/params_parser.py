@@ -238,7 +238,7 @@ class ParamsParser():
             if self.dk_order not in [2, 4, 6, 8]:
                 raise SystemExit("dk_order needs to be either 2, 4, 6, or 8.")
 
-        if self.dm_dynamics_method in ('series_expansion', 'EEA'):
+        if self.dm_dynamics_method in ('series_expansion'):
 
             self.high_damping = False
             if 'high_damping' in UP:
@@ -251,10 +251,6 @@ class ParamsParser():
             self.second_order = False 
             if 'second_order' in UP:
                 self.second_order = UP['second_order']
-
-            self.linear_response = False
-            if 'linear_response' in UP:
-                self.linear_response = UP['linear_response']
 
         self.precision = 'double'                         # Quadruple for reducing numerical noise
         if 'precision' in UP:
@@ -355,7 +351,7 @@ class ParamsParser():
             if self.solver_method != 'rk4':
                 raise SystemExit("Error: Quadruple precision only works with Runge-Kutta 4 ODE solver.")
         else:
-            raise SystemExit("Only default or quadruple precision available.")
+            raise SystemExit("Only double or quadruple precision available.")
 
         # Derived initial condition
         self.e_fermi_eV = UP['e_fermi']

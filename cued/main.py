@@ -255,7 +255,7 @@ def run_sbe(
                                      H.A_E_dir, H.energies, y0,
                                      P.dk, P.dt, rhs_ode)
 
-            elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
+            elif P.dm_dynamics_method in ('series_expansion'):
                 T.solution_y_vec[:-1], T.time_integral =\
                     von_neumann_series(T.t[ti], T.A_field[ti], T.E_field[ti],
                                        path, sys, y0[:-1], T.time_integral, P, ti)
@@ -417,7 +417,7 @@ def calculate_solution_at_timestep(
                 T.A_field[ti] = T.solution_y_vec[-1].real
                 T.E_field[ti] = T.electric_field(T.t[ti])
 
-    elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
+    elif P.dm_dynamics_method in ('series_expansion'):
 
         # Do not append the last element (A_field)
         T.solution = T.solution_y_vec[:-1].reshape(P.Nk1, P.bands, P.bands)
@@ -589,7 +589,7 @@ def von_neumann_series(
     # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
     path_after_shift = np.copy(path)
 
-    if not P.gauge == 'length' or not P.linear_response:
+    if not P.gauge == 'length':
         path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
         path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
 

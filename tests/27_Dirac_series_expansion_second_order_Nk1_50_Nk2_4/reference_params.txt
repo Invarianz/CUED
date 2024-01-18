@@ -197,7 +197,6 @@ high_damping = False
 kweight = 0.00012665147955292225
 length_BZ_E_dir = 5.0
 length_BZ_ortho = 0.2
-linear_response = False
 n = 2
 n_sheets = 1
 num_dimensions = automatic
