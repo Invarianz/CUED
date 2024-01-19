@@ -1,10 +1,83 @@
 import numpy as np
 
-from numba import vectorize 
+from scipy.integrate import ode
 
-from typing import Callable
+from typing import Callable, Tuple, Union
 
-from cued.utility.njit import conditional_njit, evaluate_njit_matrix
+from cued.utility.njit import conditional_njit
+
+def dispatch_rhs_ode_and_solver(
+    P,
+    T,
+    sys
+) -> Tuple[Union[Callable, int], Union[ode, int]]:
+
+    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
+        rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
+
+        if P.solver_method in ('bdf', 'adams'):
+            solver = ode(rhs_ode, jac=None).set_integrator('zvode', method=P.solver_method, max_step=P.dt)
+        elif P.solver_method == 'rk4':
+            solver = rk4solver(rhs_ode, dt=P.dt)
+        else:
+            raise AttributeError("You have to either assign bdf, adams or rk4 as solver method")
+    else:
+        rhs_ode = 0
+        solver = 0
+
+    return rhs_ode, solver
+
+class rk4solver():
+    """
+    This class rebuilds the signature of a scipy.integrate.ode solver
+    """
+    def __init__(self, rhs_ode, dt):
+        self.rhs_ode = rhs_ode
+        self.dt = dt
+
+    def set_initial_value(self, y0, t0):
+        # Initial
+        self.y0 = y0
+        # Updated
+        self.y = y0
+        # Initial
+        self.t0 = t0
+        # Updated
+        self.t = t0
+
+        return self
+
+    def set_f_params(self, kpath, dipole_in_path, e_in_path, y0, dk):
+        self.kpath = kpath
+        self.dipole_in_path = dipole_in_path
+        self.e_in_path = e_in_path
+        self.y0 = y0
+        self.dk = dk
+
+    def integrate(self, t):
+        self.t = t
+        k1 = self.rhs_ode(
+                self.t - self.dt, self.y, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k2 = self.rhs_ode(
+                self.t - 0.5*self.dt, self.y + 0.5*k1, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k3 = self.rhs_ode(
+                self.t - 0.5*self.dt, self.y + 0.5*k2, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k4 = self.rhs_ode(
+                self.t, self.y + k3, self.kpath, 
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+
+        self.y = self.y + self.dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    def successful(self):
+        return True
+
 
 def make_rhs_ode_2_band(
     sys,
@@ -197,13 +270,13 @@ def make_rhs_ode_2_band(
         return ecv_in_path, dipole_in_path, A_in_path
 
     @conditional_njit(P.type_complex_np)
-    def fvelocity(t, y, kpath, dipole_in_path, _e_in_path, y0, _dk):
+    def fvelocity(t, y, kpath, _dipole_in_path, _e_in_path, y0, _dk):
         """
         Velocity gauge needs a recalculation of energies and dipoles as k
         is shifted according to the vector potential A
         """
 
-        ecv_in_path, dipole_in_path[:, 0, 1], A_in_path = pre_velocity(kpath, y[-1].real)
+        ecv_in_path, dipole_in_path, A_in_path = pre_velocity(kpath, y[-1].real)
         # x != y(t+dt)
         x = np.empty(np.shape(y), dtype=type_complex_np)
 
@@ -218,7 +291,7 @@ def make_rhs_ode_2_band(
 
             # Rabi frequency: w_R = d_12(k).E(t)
             # Rabi frequency conjugate
-            wr = dipole_in_path[k, 0, 1]*electric_f
+            wr = dipole_in_path[k]*electric_f
             wr_c = wr.conjugate()
 
             # Rabi frequency: w_R = (d_11(k) - d_22(k))*E(t)

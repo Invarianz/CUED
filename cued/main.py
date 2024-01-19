@@ -7,7 +7,7 @@ from scipy.integrate import ode
 from sys import exit
 from time import perf_counter
 
-from typing import cast, Callable, OrderedDict, Tuple, Union
+from typing import cast, OrderedDict, Tuple
 
 from cued.utility.constants import au_to_fs
 from cued.utility.data_containers import (FrequencyContainers, TimeContainers,
@@ -19,7 +19,7 @@ from cued.plotting.latex_output_pdf import write_and_compile_latex_PDF, write_an
 from cued.plotting.read_data import read_dataset
 from cued.kpoint_mesh import hex_mesh, rect_mesh
 from cued.observables import *
-from cued.rhs_ode import *
+from cued.rhs_ode import dispatch_rhs_ode_and_solver
 
 
 
@@ -174,7 +174,7 @@ def run_sbe(
     # Compile symbolic expressions to functions
     sys.make_eigensystem_jit(P.type_complex_np)
 
-    rhs_ode, solver = make_rhs_ode(P, T, sys)
+    rhs_ode, solver = dispatch_rhs_ode_and_solver(P, T, sys)
 
     # Instance of empty system variable container
 
@@ -217,11 +217,10 @@ def run_sbe(
 
         # Set the initual values and function parameters for the current kpath
         if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-            if P.solver_method in ('bdf', 'adams'):
+            if P.solver_method in ('bdf', 'adams', 'rk4'):
+                solver = cast(ode, solver)
                 solver.set_initial_value(y0, P.t0)\
                     .set_f_params(path, H.A_E_dir, H.energies, y0, P.dk)
-            elif P.solver_method == 'rk4':
-                T.solution_y_vec = y0
         elif P.dm_dynamics_method in ('series_expansion'):
             T.solution_y_vec = np.copy(y0)
             T.time_integral = np.zeros((P.Nk1, P.bands, P.bands),
@@ -245,15 +244,10 @@ def run_sbe(
 
             # Integrate one integration time step
             if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-                if P.solver_method in ('bdf', 'adams'):
+                if P.solver_method in ('bdf', 'adams', 'rk4'):
+                    solver = cast(ode, solver)
                     solver.integrate(solver.t + P.dt)
                     solver_successful = solver.successful()
-
-                elif P.solver_method == 'rk4':
-                    T.solution_y_vec =\
-                        rk_integrate(T.t[ti], T.solution_y_vec, path,
-                                     H.A_E_dir, H.energies, y0,
-                                     P.dk, P.dt, rhs_ode)
 
             elif P.dm_dynamics_method in ('series_expansion'):
                 T.solution_y_vec[:-1], T.time_integral =\
@@ -337,31 +331,6 @@ def make_BZ(
         P.Nk1 = 1
         P.Nk2 = Nk1_buf * Nk2_buf
 
-def make_rhs_ode(
-    P,
-    T,
-    sys
-) -> Tuple[Union[Callable, int], Union[ode, int]]:
-
-    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-        if P.solver == '2band':
-            if P.bands != 2:
-                raise AttributeError('2-band solver works for 2-band systems only')
-            else:
-                rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
-        else:
-            rhs_ode = 0
-
-        if P.solver_method in ('bdf', 'adams'):
-            solver = ode(rhs_ode, jac=None).set_integrator('zvode', method=P.solver_method, max_step=P.dt)
-        else:
-            solver = 0
-
-    else:
-        rhs_ode = 0
-        solver = 0
-
-    return rhs_ode, solver
 
 
 def prepare_current_calculations(
@@ -395,7 +364,7 @@ def calculate_solution_at_timestep(
     is_first_Nk2_idx = (Mpi.local_Nk2_idx_list[0] == Nk2_idx)
 
     if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-        if P.solver_method in ('bdf', 'adams'):
+        if P.solver_method in ('bdf', 'adams', 'rk4'):
             # Do not append the last element (A_field)
             T.solution = solver.y[:-1].reshape(P.Nk1, P.bands, P.bands)
 
@@ -404,17 +373,6 @@ def calculate_solution_at_timestep(
                 # Construct time and A_field only in first round
                 T.t[ti] = solver.t
                 T.A_field[ti] = solver.y[-1].real
-                T.E_field[ti] = T.electric_field(T.t[ti])
-
-        elif P.solver_method == 'rk4':
-            # Do not append the last element (A_field)
-            T.solution = T.solution_y_vec[:-1].reshape(P.Nk1, P.bands, P.bands)
-
-            # Construct time array only once
-            if is_first_Nk2_idx:
-                # Construct time and A_field only in first round
-                T.t[ti] = ti*P.dt + P.t0
-                T.A_field[ti] = T.solution_y_vec[-1].real
                 T.E_field[ti] = T.electric_field(T.t[ti])
 
     elif P.dm_dynamics_method in ('series_expansion'):
@@ -489,26 +447,6 @@ def calculate_currents(
         T.j_intra_ortho[ti] += j_intra_ortho_buf
         T.j_anom_ortho[ti, :] += j_anom_ortho_buf
 
-def rk_integrate(
-    t,
-    y,
-    kpath,
-    A_E_dir,
-    energies,
-    y0,
-    dk,
-    dt,
-    rhs_ode
-):
-
-    k1 = rhs_ode(t,          y,          kpath, A_E_dir, energies, y0, dk)
-    k2 = rhs_ode(t + 0.5*dt, y + 0.5*k1, kpath, A_E_dir, energies, y0, dk)
-    k3 = rhs_ode(t + 0.5*dt, y + 0.5*k2, kpath, A_E_dir, energies, y0, dk)
-    k4 = rhs_ode(t +     dt, y +     k3, kpath, A_E_dir, energies, y0, dk)
-
-    ynew = y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-
-    return ynew
 
 @njit
 def y0deriv(y, dk, Nk_path, n, dk_order, type_complex_np):
@@ -589,15 +527,14 @@ def von_neumann_series(
     # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
     path_after_shift = np.copy(path)
 
-    if not P.gauge == 'length':
-        path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
-        path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
+    H = SystemContainers()
 
-        H = SystemContainers()
-        H.energies = sys.evaluate_energy(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_real_np)
-        H.Ax, H.Ay = sys.evaluate_dipole(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_complex_np)
-        H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
-        H.A_ortho = H.Ax * P.E_ort[0] + H.Ay * P.E_ort[1]
+    path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
+    path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
+
+    H.energies = sys.evaluate_energy(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_real_np)
+    H.Ax, H.Ay = sys.evaluate_dipole(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_complex_np)
+    H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
 
     if P.gauge == 'length' :
         if ti == 0:
@@ -617,8 +554,8 @@ def von_neumann_series(
     if P.second_order:
         if P.high_damping:
             y_mat, time_integral =\
-                second_order(y_mat, time_integral, y0_mat, E_field,
-                             H.A_E_dir, P.T2, P.dt, P.bands, P.Nk1)
+                second_order_high_damping(y_mat, time_integral, y0_mat, E_field,
+                                          H.A_E_dir, P.T2, P.dt, P.bands, P.Nk1)
         else:
             print('Warning: second order without high damping not implemented yet!')
 
@@ -927,6 +864,7 @@ def calculate_fourier(T, P, W):
             W.j_E_dir_GT.append(W.j_E_dir_CT)
             W.I_ortho_GT.append(W.I_ortho_CT)
             W.j_ortho_GT.append(W.j_ortho_CT)
+
 # def write_full_density_mpi(T, P, sys, Mpi):
 #     relative_dir = 'densities'
 #     if Mpi.rank == 0:
@@ -1229,12 +1167,14 @@ def fourier_current_intensity(
     prefac_emission,
     freq,
     P
-):
+) -> Tuple[np.ndarray, np.ndarray]:
 
     ndt_fft = freq.size
     ndt = np.size(jt, axis=0)
 
     jt_for_fft = np.zeros(ndt_fft, dtype=P.type_real_np)
+    jw = None
+    Iw = None
     if np.ndim(jt) == 1:
         jt_for_fft[(ndt_fft - ndt)//2:(ndt_fft + ndt)//2] = jt[:]*window_function[:]
         jw = fourier(dt_out, jt_for_fft)
@@ -1260,6 +1200,11 @@ def fourier_current_intensity(
                 jt_for_fft[(ndt_fft - ndt)//2:(ndt_fft + ndt)//2] = jt[:, i, j]*window_function[:]
                 jw[:, i, j] = fourier(dt_out, jt_for_fft)
                 Iw[:, i, j] = prefac_emission*(freq**2)*np.abs(jw[:, i, j])**2
+    else:
+        raise ValueError("jt has to be 1, 2 or 3 dimensional."
+                         "Something strange happenend.")
+    Iw = cast(np.ndarray, Iw)
+    jw = cast(np.ndarray, jw)
 
     return Iw, jw
 

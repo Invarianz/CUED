@@ -35,6 +35,14 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "07_Dirac_Nk1_30_Nk2_2_length_Runge_Kutta_4",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/07_Dirac_Nk1_30_Nk2_2_length_Runge_Kutta_4/runscript.py",
+            "env": {"PYTHONPATH": "${workspaceFolder}"},
+            "console": "integratedTerminal"
+        },
+        {
             "name": "27_Dirac_series_expansion_second_order_Nk1_50_Nk2_4",
             "type": "python",
             "request": "launch",
