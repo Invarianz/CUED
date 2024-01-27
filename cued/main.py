@@ -7,7 +7,7 @@ from scipy.integrate import ode
 from sys import exit
 from time import perf_counter
 
-from typing import cast, OrderedDict, Tuple
+from typing import cast, Callable, Optional, OrderedDict, Tuple
 
 from cued.utility.constants import au_to_fs
 from cued.utility.data_containers import (FrequencyContainers, TimeContainers,
@@ -91,7 +91,7 @@ def sbe_solver(
 
     #run sbe for i'th parameter set
     for i in Mpi.local_params_idx_list:
-        P.distribute_parameters(i, params)
+        P.distribute_parameters(i)
         run_sbe(sys, P, Mpi)
 
     # Wait until all calculations are finished.
@@ -202,7 +202,7 @@ def run_sbe(
 
         # Prepare calculations of observables
         current_exact_path, polarization_inter_path, current_intra_path =\
-            prepare_current_calculations(path, Nk2_idx, P, sys)
+            prepare_current_calculations(path, P, sys)
 
         # Initialize the values of of each k point vector
         # In the velocity gauge this is an empty container
@@ -321,6 +321,8 @@ def make_BZ(
             exit('Parallelization over points can only be used with the velocity gauge')
         Nk1_buf = np.copy(P.Nk1)
         Nk2_buf = np.copy(P.Nk2)
+        Nk1_buf = cast(int, Nk1_buf)
+        Nk2_buf = cast(int, Nk2_buf)
         paths_buf = np.copy(P.paths)
 
         P.paths = np.empty((Nk1_buf*Nk2_buf, 1, 2), dtype=P.type_real_np)
@@ -335,20 +337,22 @@ def make_BZ(
 
 def prepare_current_calculations(
     path,
-    Nk2_idx,
     P,
     sys
-):
+) -> Tuple[Callable, Optional[Callable], Optional[Callable]]:
 
+    current_exact_path = None
     polarization_inter_path = None
     current_intra_path = None
     if P.gauge == 'length':
         current_exact_path = make_current_exact_path_length(path, P, sys)
-    if P.gauge == 'velocity':
+    elif P.gauge == 'velocity':
         current_exact_path = make_current_exact_path_velocity(path, P, sys)
     if P.split_current:
         polarization_inter_path = make_polarization_path(path, P, sys)
         current_intra_path = make_current_path(path, P, sys)
+    current_exact_path = cast(Callable, current_exact_path)
+
     return current_exact_path, polarization_inter_path, current_intra_path
 
 
@@ -927,6 +931,7 @@ def write_screening_combinations(P, params):
     # Load a reference f/f0 into memory
     P.construct_current_parameters_and_filename(0)
     _t, freq_data, _d = read_dataset(path='.', prefix=P.filename_prefix)
+    freq_data = cast(np.ndarray, freq_data)
 
     # First E-dir, second ortho, third combined data
     S = np.empty(3, dtype=ScreeningContainers)

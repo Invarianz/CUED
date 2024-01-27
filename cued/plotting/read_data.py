@@ -1,6 +1,8 @@
 import numpy as np
 import os
 
+from typing import Optional, Tuple
+
 def read_datasets(subpaths, mute=False):
     """
     Specify a path and read all subfolders
@@ -20,7 +22,12 @@ def read_datasets(subpaths, mute=False):
 
     return time_data_container, freq_data_container, dens_data_container
 
-def read_dataset(path, prefix='', suffix='', mute=False):
+def read_dataset(
+    path,
+    prefix='',
+    suffix='',
+    mute=False
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], None]:
     """
     Read the data from a specific folder;
     Create memory views of all datasets
@@ -63,13 +70,13 @@ def read_dataset(path, prefix='', suffix='', mute=False):
             freq_data = np.genfromtxt(filepath, names=True, encoding='utf8', deletechars='')
 
         # Density data
-        if (filename.startswith(dens_string) and '.dat' in filename):
-            print("Warning: Density as text file is still not implemented.")
-            if not mute:
-                print("Reading density:", filepath)
-            dens_data = np.genfromtxt(filepath, names=True, encoding='utf8', deletechars='')
+        # if (filename.startswith(dens_string) and '.dat' in filename):
+        #     print("Warning: Density as text file is still not implemented.")
+        #     if not mute:
+        #         print("Reading density:", filepath)
+        #     dens_data = np.genfromtxt(filepath, names=True, encoding='utf8', deletechars='')
 
-    if time_data is None and freq_data is None and dens_data is None:
-        raise RuntimeError("No Data found.")
+    if time_data is None and freq_data is None:
+        raise RuntimeError("No data found.")
 
     return time_data, freq_data, dens_data

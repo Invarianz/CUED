@@ -166,15 +166,10 @@ def hex_mesh(P):
 
 def two_pi_factor(P):
     exponent = None # Set later
-    if P.num_dimensions == '1':
+    if P.Nk2 == 1:
         exponent = -1
-    elif P.num_dimensions == '2':
+    else:
         exponent = -2
-    elif P.num_dimensions == 'automatic':
-        if P.Nk2 == 1:
-            exponent = -1
-        else:
-            exponent = -2
 
     exponent = cast(int, exponent)
     return P.type_real_np((2.0*np.pi)**exponent)

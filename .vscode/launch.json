@@ -43,6 +43,14 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "21_MPI_parallel_chirp_and_phase_screen_Dirac_Hamiltonian",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/21_MPI_parallel_chirp_and_phase_screen_Dirac_hamiltonian/runscript.py",
+            "env": {"PYTHONPATH": "${workspaceFolder}"},
+            "console": "integratedTerminal"
+        },
+        {
             "name": "27_Dirac_series_expansion_second_order_Nk1_50_Nk2_4",
             "type": "python",
             "request": "launch",

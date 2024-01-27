@@ -1,35 +1,24 @@
 import numpy as np
 
 from scipy.integrate import ode
-
 from typing import Callable, Tuple, Union
 
 from cued.utility.njit import conditional_njit
 
-def dispatch_rhs_ode_and_solver(
-    P,
-    T,
-    sys
-) -> Tuple[Union[Callable, int], Union[ode, int]]:
-
-    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-        rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
-
-        if P.solver_method in ('bdf', 'adams'):
-            solver = ode(rhs_ode, jac=None).set_integrator('zvode', method=P.solver_method, max_step=P.dt)
-        elif P.solver_method == 'rk4':
-            solver = rk4solver(rhs_ode, dt=P.dt)
-        else:
-            raise AttributeError("You have to either assign bdf, adams or rk4 as solver method")
-    else:
-        rhs_ode = 0
-        solver = 0
-
-    return rhs_ode, solver
-
-class rk4solver():
+class seriesSolver():
+    """"
+    This class imitates methods of a scipy.integrate.ode solver.
+    It only implements the methods needed for the solver loop in CUED.
+    To be specific: This is a series expansion
     """
-    This class rebuilds the signature of a scipy.integrate.ode solver
+    def __init__(self, dt):
+        self.dt = dt
+
+class rk4Solver():
+    """
+    This class imitates methods of a scipy.integrate.ode solver.
+    It only implements the methods needed for the solver loop in CUED.
+    To be specific: This is a Runge-Kutta 4 solver.
     """
     def __init__(self, rhs_ode, dt):
         self.rhs_ode = rhs_ode
@@ -89,30 +78,6 @@ def make_rhs_ode_2_band(
 
         Author:
         Additional Contact: Jan Wilhelm (jan.wilhelm@ur.de)
-
-        Parameters
-        ----------
-        sys : class
-            Symbolic Hamiltonian of the system
-        dipole : class
-            Symbolic expression for the dipole elements (eq. (37/38))
-        E_dir : np.ndarray
-            2-dimensional array with the x and y component of the electric field
-        gamma1 : float
-            inverse of occupation damping time (T_1 in (eq. (?))
-        gamma2 : float
-            inverse of polarization damping time (T_2 in eq. (80))
-        electric_field : jitted function
-            absolute value of the instantaneous driving field E(t) (eq. (75))
-        gauge: 'length' or 'velocity'
-            parameter to determine which gauge is used in the routine
-        do_semicl: boolean
-            parameter to determine whether a semiclassical calculation will be done
-
-        Returns
-        -------
-        f :
-            right hand side of ode d/dt(rho(t)) = f(rho, t) (eq. (39/47/80))
     """
     gamma1 = P.gamma1
     gamma2 = P.gamma2
@@ -327,3 +292,25 @@ def make_rhs_ode_2_band(
         return freturn(t, y, kpath, dipole_in_path, e_in_path, y0, dk)
 
     return f
+
+def dispatch_rhs_ode_and_solver(
+    P,
+    T,
+    sys
+) -> Tuple[Union[Callable, int], Union[ode, rk4Solver, int]]:
+
+    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
+        rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
+
+        if P.solver_method in ('bdf', 'adams'):
+            solver = ode(rhs_ode, jac=None)\
+                .set_integrator('zvode', method=P.solver_method, max_step=P.dt)
+        elif P.solver_method == 'rk4':
+            solver = rk4Solver(rhs_ode, dt=P.dt)
+        else:
+            raise AttributeError("You have to either assign bdf, adams or rk4 as solver method")
+    else:
+        rhs_ode = 0
+        solver = 0
+
+    return rhs_ode, solver
