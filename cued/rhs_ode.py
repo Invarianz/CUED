@@ -1,39 +1,83 @@
 import numpy as np
 
-from numba import vectorize 
+from scipy.integrate import ode
+from typing import Callable, Tuple, Union
 
-from cued.utility.njit import conditional_njit, evaluate_njit_matrix
+from cued.utility.njit import conditional_njit
 
-def make_rhs_ode_2_band(sys, electric_field, P):
+class seriesSolver():
+    """"
+    This class imitates methods of a scipy.integrate.ode solver.
+    It only implements the methods needed for the solver loop in CUED.
+    To be specific: This is a series expansion
+    """
+    def __init__(self, dt):
+        self.dt = dt
+
+class rk4Solver():
+    """
+    This class imitates methods of a scipy.integrate.ode solver.
+    It only implements the methods needed for the solver loop in CUED.
+    To be specific: This is a Runge-Kutta 4 solver.
+    """
+    def __init__(self, rhs_ode, dt):
+        self.rhs_ode = rhs_ode
+        self.dt = dt
+
+    def set_initial_value(self, y0, t0):
+        # Initial
+        self.y0 = y0
+        # Updated
+        self.y = y0
+        # Initial
+        self.t0 = t0
+        # Updated
+        self.t = t0
+
+        return self
+
+    def set_f_params(self, kpath, dipole_in_path, e_in_path, y0, dk):
+        self.kpath = kpath
+        self.dipole_in_path = dipole_in_path
+        self.e_in_path = e_in_path
+        self.y0 = y0
+        self.dk = dk
+
+    def integrate(self, t):
+        self.t = t
+        k1 = self.rhs_ode(
+                self.t - self.dt, self.y, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k2 = self.rhs_ode(
+                self.t - 0.5*self.dt, self.y + 0.5*k1, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k3 = self.rhs_ode(
+                self.t - 0.5*self.dt, self.y + 0.5*k2, self.kpath,
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+        k4 = self.rhs_ode(
+                self.t, self.y + k3, self.kpath, 
+                self.dipole_in_path, self.e_in_path, self.y0, self.dk
+             )
+
+        self.y = self.y + self.dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    def successful(self):
+        return True
+
+
+def make_rhs_ode_2_band(
+    sys,
+    electric_field,
+    P
+) -> Callable:
     """
         Initialization of the solver for the sbe ( eq. (39/47/80) in https://arxiv.org/abs/2008.03177)
 
         Author:
         Additional Contact: Jan Wilhelm (jan.wilhelm@ur.de)
-
-        Parameters
-        ----------
-        sys : class
-            Symbolic Hamiltonian of the system
-        dipole : class
-            Symbolic expression for the dipole elements (eq. (37/38))
-        E_dir : np.ndarray
-            2-dimensional array with the x and y component of the electric field
-        gamma1 : float
-            inverse of occupation damping time (T_1 in (eq. (?))
-        gamma2 : float
-            inverse of polarization damping time (T_2 in eq. (80))
-        electric_field : jitted function
-            absolute value of the instantaneous driving field E(t) (eq. (75))
-        gauge: 'length' or 'velocity'
-            parameter to determine which gauge is used in the routine
-        do_semicl: boolean
-            parameter to determine whether a semiclassical calculation will be done
-
-        Returns
-        -------
-        f :
-            right hand side of ode d/dt(rho(t)) = f(rho, t) (eq. (39/47/80))
     """
     gamma1 = P.gamma1
     gamma2 = P.gamma2
@@ -43,22 +87,20 @@ def make_rhs_ode_2_band(sys, electric_field, P):
     E_dir = P.E_dir
     gauge = P.gauge
 
-    sys.make_eigensystem_dipole(P)
-
     # Wire the energies
-    evf = sys.efjit[0]
-    ecf = sys.efjit[1]
+    evf = sys.e_jit[0]
+    ecf = sys.e_jit[1]
 
     # Wire the dipoles
     # kx-parameter
-    di_00xf = sys.Axfjit[0][0]
-    di_01xf = sys.Axfjit[0][1]
-    di_11xf = sys.Axfjit[1][1]
+    di_00xf = sys.Ax_jit[0][0]
+    di_01xf = sys.Ax_jit[0][1]
+    di_11xf = sys.Ax_jit[1][1]
 
     # ky-parameter
-    di_00yf = sys.Ayfjit[0][0]
-    di_01yf = sys.Ayfjit[0][1]
-    di_11yf = sys.Ayfjit[1][1]
+    di_00yf = sys.Ay_jit[0][0]
+    di_01yf = sys.Ay_jit[0][1]
+    di_11yf = sys.Ay_jit[1][1]
 
     @conditional_njit(P.type_complex_np)
     def flength(t, y, kpath, dipole_in_path, e_in_path, y0, dk):
@@ -193,13 +235,13 @@ def make_rhs_ode_2_band(sys, electric_field, P):
         return ecv_in_path, dipole_in_path, A_in_path
 
     @conditional_njit(P.type_complex_np)
-    def fvelocity(t, y, kpath, dipole_in_path, e_in_path, y0, dk):
+    def fvelocity(t, y, kpath, _dipole_in_path, _e_in_path, y0, _dk):
         """
         Velocity gauge needs a recalculation of energies and dipoles as k
         is shifted according to the vector potential A
         """
 
-        ecv_in_path, dipole_in_path[:, 0, 1], A_in_path = pre_velocity(kpath, y[-1].real)
+        ecv_in_path, dipole_in_path, A_in_path = pre_velocity(kpath, y[-1].real)
         # x != y(t+dt)
         x = np.empty(np.shape(y), dtype=type_complex_np)
 
@@ -214,7 +256,7 @@ def make_rhs_ode_2_band(sys, electric_field, P):
 
             # Rabi frequency: w_R = d_12(k).E(t)
             # Rabi frequency conjugate
-            wr = dipole_in_path[k, 0, 1]*electric_f
+            wr = dipole_in_path[k]*electric_f
             wr_c = wr.conjugate()
 
             # Rabi frequency: w_R = (d_11(k) - d_22(k))*E(t)
@@ -250,3 +292,25 @@ def make_rhs_ode_2_band(sys, electric_field, P):
         return freturn(t, y, kpath, dipole_in_path, e_in_path, y0, dk)
 
     return f
+
+def dispatch_rhs_ode_and_solver(
+    P,
+    T,
+    sys
+) -> Tuple[Union[Callable, int], Union[ode, rk4Solver, int]]:
+
+    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
+        rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
+
+        if P.solver_method in ('bdf', 'adams'):
+            solver = ode(rhs_ode, jac=None)\
+                .set_integrator('zvode', method=P.solver_method, max_step=P.dt)
+        elif P.solver_method == 'rk4':
+            solver = rk4Solver(rhs_ode, dt=P.dt)
+        else:
+            raise AttributeError("You have to either assign bdf, adams or rk4 as solver method")
+    else:
+        rhs_ode = 0
+        solver = 0
+
+    return rhs_ode, solver

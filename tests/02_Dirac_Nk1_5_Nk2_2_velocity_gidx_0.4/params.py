@@ -37,7 +37,6 @@ class params:
     # Flags for testing and features
     ##########################################################################
     gauge                   = 'velocity'         # Gauge of the system
-    gidx                    = 0.4
     fourier_window_function = 'gaussian'
     split_current           = True
     user_out                = False

@@ -13,25 +13,13 @@ class ParamsParser():
     """
     def __init__(self, UP):
 
-        self.parallelize_over_points = None
 
         # Build dictionary of all parameters, exclude:
-        excl_set = {'__weakref__', '__doc__', '__dict__', '__module__',
-                    't_pdf_densmat', 'parallelize_over_points',
-                    'gabor_gaussian_center', 'gabor_window_width'}
+        ## In build methods and variables
+        excl_set = {'__weakref__', '__doc__', '__dict__', '__module__'}
 
         # Clean excl_set from UP keys
         self.UP_keys = sorted(UP.__dict__.keys() - excl_set)
-        if hasattr(UP, 'parallelize_over_points'):
-            self.parallelize_over_points = UP.parallelize_over_points
-        # Time points for printing density matrix
-        self.t_pdf_densmat = np.array([-100, 0, 50, 100]) * fs_to_au
-        if hasattr(UP, 't_pdf_densmat'):
-            self.t_pdf_densmat = np.array(UP.t_pdf_densmat) * fs_to_au 
-        if hasattr(UP,'gabor_gaussian_center'):
-            self.gabor_gaussian_center = np.array(UP.gabor_gaussian_center) * fs_to_au
-        if hasattr(UP,'gabor_window_width'):
-            self.gabor_window_width = np.array(UP.gabor_window_width) * fs_to_au
 
         # Build list of parameter lists
         # Number of parameter combinations
@@ -44,7 +32,7 @@ class ParamsParser():
         self.UP_params_maximum = []
 
         for key in self.UP_keys:
-            self.__append_to_list(UP.__dict__[key])
+            self.__append_to_list(key, UP.__dict__[key])
 
         # We check this in main.py for path parallelization
         self.Nk2_is_list = False
@@ -55,12 +43,28 @@ class ParamsParser():
         # Build list with all possible parameter combinations
         self.params_combinations = list(product(*self.UP_params_lists))
 
-    def __append_to_list(self, param):
+        # Global parameter needed for evaluation before distribution
+        # to cores is happening (distribute_params)
+        self.parallelize_over_points = False
+        if hasattr(UP, 'parallelize_over_points'):
+            self.parallelize_over_points = UP.parallelize_over_points
+
+    def __append_to_list(self, key, param):
         """
         Check all parameters in UP for lists or ndarrays.
         Append all parameters as lists even if they only have one element
         """
-        if type(param) == list or type(param) == np.ndarray:
+        # Variables that are given as arrays or lists in UP
+        # but should not be split between mpi ranks. Treat them as
+        # if single value and wrap in list
+        global_array_set = {'gabor_gaussian_center', 'gabor_window_width',
+                            't_pdf_densmat'}
+        if key in global_array_set:
+            if type(param) == np.ndarray:
+                param = param.tolist()
+            self.UP_params_lists.append([param])
+            self.UP_params_maximum.append(0)
+        elif (type(param) == list or type(param) == np.ndarray):
             if type(param) == np.ndarray:
                 param = param.tolist()
             if not type(param[0]) == str:
@@ -103,7 +107,7 @@ class ParamsParser():
         return current_parameters
 
 
-    def distribute_parameters(self, param_idx, UP):
+    def distribute_parameters(self, param_idx):
         '''
         Take Index of parameter (MPI parallel) and write current parameters
         '''
@@ -170,6 +174,12 @@ class ParamsParser():
 
     def __optional(self, UP):
         '''Optional parameters or default values'''
+
+        # Time points for printing density matrix
+        self.t_pdf_densmat = np.array([-100, 0, 50, 100]) * fs_to_au
+        if hasattr(UP, 't_pdf_densmat'):
+            self.t_pdf_densmat = np.array(UP.t_pdf_densmat) * fs_to_au 
+
         self.user_out = True # Command line progress output
         if 'user_out' in UP:
             self.user_out = UP['user_out']
@@ -235,10 +245,11 @@ class ParamsParser():
         self.dk_order = 8                                 # Accuracy order of density-matrix k-deriv.
         if 'dk_order' in UP:
             self.dk_order = UP['dk_order']                   # with length gauge (avail: 2,4,6,8)
-            if self.dk_order not in [2, 4, 6, 8]:
-                raise SystemExit("dk_order needs to be either 2, 4, 6, or 8.")
+            orders = [2, 4, 6, 8]
+            if self.dk_order not in orders:
+                raise SystemExit("dk_order is one of {:s}".format(str(orders)))
 
-        if self.dm_dynamics_method in ('series_expansion', 'EEA'):
+        if self.dm_dynamics_method in ('series_expansion'):
 
             self.high_damping = False
             if 'high_damping' in UP:
@@ -252,10 +263,6 @@ class ParamsParser():
             if 'second_order' in UP:
                 self.second_order = UP['second_order']
 
-            self.linear_response = False
-            if 'linear_response' in UP:
-                self.linear_response = UP['linear_response']
-
         self.precision = 'double'                         # Quadruple for reducing numerical noise
         if 'precision' in UP:
             self.precision = UP['precision']
@@ -268,13 +275,20 @@ class ParamsParser():
         if 'factor_freq_resolution' in UP:
             self.factor_freq_resolution = UP['factor_freq_resolution']
 
-        self.num_dimensions = 'automatic'                 # dimensionality for determining the prefactor (2*pi)^d of current
-        if 'num_dimensions' in UP:
-            self.num_dimensions = UP['num_dimensions']
-
         self.gabor_transformation = False
         if 'gabor_transformation' in UP:
             self.gabor_transformation = UP['gabor_transformation']
+
+            # This was at the __init__ there is an issue with distribution here..
+            if 'gabor_gaussian_center' in UP:
+                self.gabor_gaussian_center = np.array(UP['gabor_gaussian_center']) * fs_to_au
+            else:
+                raise ValueError("Gabor transformation needs a center (gabor_gaussian_center).")
+
+            if 'gabor_window_width' in UP:
+                self.gabor_window_width = np.array(UP['gabor_window_width']) * fs_to_au
+            else:
+                raise ValueError("Gabor transformation needs a width (gabor_window_width).")
 
         self.fourier_window_function = 'hann'             # gaussian, parzen or hann
         if 'fourier_window_function' in UP:
@@ -292,10 +306,6 @@ class ParamsParser():
                 self.gaussian_center = UP['gaussian_center']*fs_to_au
             else:
                 self.gaussian_center       = 0
-
-        self.degenerate_evals = False
-        if 'degenerate_evals' in UP:
-            self.degenerate_evals = UP['degenerate_evals']
 
         # Flag for Zeeman term
         self.Zeeman = False
@@ -347,15 +357,15 @@ class ParamsParser():
 
         # Derived precision parameters
         if self.precision == 'double':
-            self.type_real_np = np.float64
-            self.type_complex_np = np.complex128
+            self.type_real_np = np.double
+            self.type_complex_np = np.cdouble
         elif self.precision == 'quadruple':
             self.type_real_np = np.longdouble
             self.type_complex_np = np.longcomplex
             if self.solver_method != 'rk4':
                 raise SystemExit("Error: Quadruple precision only works with Runge-Kutta 4 ODE solver.")
         else:
-            raise SystemExit("Only default or quadruple precision available.")
+            raise SystemExit("Only double or quadruple precision available.")
 
         # Derived initial condition
         self.e_fermi_eV = UP['e_fermi']

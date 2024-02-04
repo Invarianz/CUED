@@ -1,7 +1,7 @@
 import numpy as np
-###############################################################################
-# K-Point meshes
-###############################################################################
+
+from typing import cast
+
 def rect_mesh(P):
     '''
     Create a rectangular mesh
@@ -95,6 +95,7 @@ def hex_mesh(P):
     # Containers for the mesh, and BZ directional paths
     mesh = []
     paths = []
+    dk = None # Will be set later
 
     # Create the Monkhorst-Pack mesh
     if P.align == 'M':
@@ -103,8 +104,12 @@ def hex_mesh(P):
                                " needs to be divisible by 3")
         b_a1 = b1
         b_a2 = (2*np.pi/(3*P.a))*np.array([1, np.sqrt(3)], dtype=P.type_real_np)
-        alpha1 = np.linspace(-0.5 + (1/(2*P.Nk1)), 0.5 - (1/(2*P.Nk1)), num=P.Nk1, dtype=P.type_real_np)
-        alpha2 = np.linspace(-1.0 + (1.5/(2*P.Nk2)), 0.5 - (1.5/(2*P.Nk2)), num=P.Nk2, dtype=P.type_real_np)
+        alpha1 = np.linspace(-0.5 + (1/(2*P.Nk1)), 0.5 - (1/(2*P.Nk1)),
+                             num=P.Nk1,
+                             dtype=P.type_real_np)
+        alpha2 = np.linspace(-1.0 + (1.5/(2*P.Nk2)), 0.5 - (1.5/(2*P.Nk2)),
+                             num=P.Nk2,
+                             dtype=P.type_real_np)
         for a2 in alpha2:
             # Container for a single gamma-M path
             path_M = []
@@ -155,18 +160,16 @@ def hex_mesh(P):
             paths.append(path_K)
         dk = np.linalg.norm(1.5*b_a1)/P.Nk1
 
+    dk = cast(float, dk)
     return dk, (3*np.sqrt(3)/2)*(4*np.pi/(P.a*3))**2/P.Nk*two_pi_factor(P), np.array(paths), np.array(mesh)
 
 
 def two_pi_factor(P):
-    if P.num_dimensions == '1':
+    exponent = None # Set later
+    if P.Nk2 == 1:
         exponent = -1
-    elif P.num_dimensions == '2':
+    else:
         exponent = -2
-    elif P.num_dimensions == 'automatic':
-        if P.Nk2 == 1:
-            exponent = -1
-        else:
-            exponent = -2
 
+    exponent = cast(int, exponent)
     return P.type_real_np((2.0*np.pi)**exponent)

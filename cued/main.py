@@ -4,11 +4,14 @@ from itertools import product
 from numba import njit
 from numpy.fft import fftshift, fft, ifftshift, ifft, fftfreq
 from scipy.integrate import ode
+from sys import exit
 from time import perf_counter
-from typing import OrderedDict
+
+from typing import cast, Callable, Optional, OrderedDict, Tuple, Union
 
 from cued.utility.constants import au_to_fs
-from cued.utility.data_containers import FrequencyContainers, TimeContainers, ScreeningContainers
+from cued.utility.data_containers import (FrequencyContainers, TimeContainers,
+                                          ScreeningContainers, SystemContainers)
 from cued.utility.params_parser import ParamsParser
 from cued.utility.multicore import MpiHelpers
 from cued.utility.dir import rmdir_mkdir_chdir, chdir
@@ -16,15 +19,18 @@ from cued.plotting.latex_output_pdf import write_and_compile_latex_PDF, write_an
 from cued.plotting.read_data import read_dataset
 from cued.kpoint_mesh import hex_mesh, rect_mesh
 from cued.observables import *
-from cued.rhs_ode import *
+from cued.rhs_ode import dispatch_rhs_ode_and_solver, rk4Solver
 
-import sys as system
 
-def sbe_solver(sys, params):
+
+def sbe_solver(
+    sys,
+    params
+):
     """
-    Function that initializes MPI-parallelization and distributes parameters that are given as a
-    list in the params.py file to the individual MPI-processes. Runs the SBE-calculation for each
-    parameter combination.
+    Function that initializes MPI-parallelization and distributes parameters
+    that are given as a list in the params.py file to the individual
+    MPI-processes. Runs the SBE-calculation for each parameter combination.
 
     Parameters
     ----------
@@ -38,7 +44,6 @@ def sbe_solver(sys, params):
     P = ParamsParser(params)
     Mpi = MpiHelpers()
 
-    P.bands = sys.bands
     P.combined_parallelization = False
 
     # Parallelize over paths and parameters if the following conditions are met:
@@ -64,7 +69,7 @@ def sbe_solver(sys, params):
             if Mpi.rank == 0:
                 print("For parallelization over paths and parameters, choose "
                         + "the number of MPI ranks from " + str(ncpu_list) )
-            system.exit()
+            exit()
 
     # Parallelize over parameters if there are more parameter combinations than paths
     elif (P.Nk2_is_list or P.num_param_combinations >= params.Nk2) and not P.parallelize_over_points:
@@ -85,14 +90,17 @@ def sbe_solver(sys, params):
 
     #run sbe for i'th parameter set
     for i in Mpi.local_params_idx_list:
-        P.distribute_parameters(i, params)
+        P.distribute_parameters(i)
         run_sbe(sys, P, Mpi)
 
     # Wait until all calculations are finished.
     if P.save_screening or P.save_latex_pdf:
         write_screening_combinations_mpi(P, params, Mpi)
 
-def make_subcommunicators(Mpi, P):
+def make_subcommunicators(
+    Mpi,
+    P
+):
 
     if P.combined_parallelization:
         Mpi.subcomm = Mpi.comm.Split(Mpi.color, Mpi.rank)
@@ -111,11 +119,16 @@ def make_subcommunicators(Mpi, P):
         Mpi.subcomm = Mpi.comm.Split(Mpi.rank, Mpi.rank)
 
 
-def run_sbe(sys, P, Mpi):
+def run_sbe(
+    sys,
+    P,
+    Mpi
+):
     """
-    line numberSolver for the semiconductor bloch equation ( eq. (39) or (47) in https://arxiv.org/abs/2008.03177)
-    for a n band system with numerical calculation of the dipole elements (analytical dipoles
-    can be used for n=2)
+    line numberSolver for the semiconductor bloch equation
+    ( eq. (39) or (47) in https://arxiv.org/abs/2008.03177)
+    for a n band system with numerical calculation of the dipole elements
+    (analytical dipoles can be used for n=2)
 
     Parameters
     ----------
@@ -153,12 +166,16 @@ def run_sbe(sys, P, Mpi):
     ###########################################################################
 
     # Make containers for time- and frequency- dependent observables
-    T = TimeContainers(P)
+    T = TimeContainers(P, sys.bands)
     W = FrequencyContainers()
+    H = SystemContainers()
 
-    # Make rhs of ode for 2band; returns 0 for series expansion
-    sys.eigensystem_dipole_path(P.paths[0], P) # change structure, such that hfjit gets calculated first
-    rhs_ode, solver = make_rhs_ode(P, T, sys)
+    # Compile symbolic expressions to functions
+    sys.make_eigensystem_jit(P.type_complex_np)
+
+    rhs_ode, solver = dispatch_rhs_ode_and_solver(P, T, sys)
+
+    # Instance of empty system variable container
 
     ###########################################################################
     # SOLVING
@@ -170,28 +187,43 @@ def run_sbe(sys, P, Mpi):
         if P.user_out:
             print('Solving SBE for Path', Nk2_idx+1)
 
-        # Evaluate the dipole components along the path
-        sys.eigensystem_dipole_path(path, P)
+        # Evaluate all system properties along the path
+        H.energies = sys.evaluate_energy(kx=path[:, 0], ky=path[:, 1], dtype=P.type_real_np)
+        H.Ax, H.Ay = sys.evaluate_dipole(kx=path[:, 0], ky=path[:, 1], dtype=P.type_complex_np)
+
+        if P.dm_dynamics_method == 'semiclassics':
+            H.A_E_dir = np.zeros([P.Nk1, sys.bands, sys.bands], dtype=P.type_complex_np)
+            H.A_ortho = np.zeros([P.Nk1, sys.bands, sys.bands], dtype=P.type_complex_np)
+            H.Bcurv = sys.evaluate_curvature(kx=path[:, 0], ky=path[:, 1], dtype=P.type_complex_np)
+        else:
+            H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
+            H.A_ortho = H.Ax * P.E_ort[0] + H.Ay * P.E_ort[1]
 
         # Prepare calculations of observables
         current_exact_path, polarization_inter_path, current_intra_path =\
-            prepare_current_calculations(path, Nk2_idx, P, sys)
+            prepare_current_calculations(path, P, sys)
 
         # Initialize the values of of each k point vector
-
-        y0 = initial_condition(P, sys.e_in_path)
+        # In the velocity gauge this is an empty container
+        y0 = initial_condition(
+                 H.energies,
+                 P.e_fermi,
+                 P.temperature,
+                 P.type_complex_np
+             )
+        # Append empty container for A_field
         y0 = np.append(y0, [0.0])
 
         # Set the initual values and function parameters for the current kpath
         if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-            if P.solver_method in ('bdf', 'adams'):
+            if P.solver_method in ('bdf', 'adams', 'rk4'):
+                solver = cast(Union[ode, rk4Solver], solver)
                 solver.set_initial_value(y0, P.t0)\
-                    .set_f_params(path, sys.dipole_in_path, sys.e_in_path, y0, P.dk)
-            elif P.solver_method == 'rk4':
-                T.solution_y_vec[:] = y0
-        elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
+                    .set_f_params(path, H.A_E_dir, H.energies, y0, P.dk)
+        elif P.dm_dynamics_method in ('series_expansion'):
             T.solution_y_vec = np.copy(y0)
-            T.time_integral = np.zeros((P.Nk1, P.bands, P.bands), dtype=P.type_complex_np)
+            T.time_integral = np.zeros((P.Nk1, sys.bands, sys.bands),
+                                       dtype=P.type_complex_np)
         # Propagate through time
         # Index of current integration time step
         ti = 0
@@ -202,24 +234,24 @@ def run_sbe(sys, P, Mpi):
             if (ti % (P.Nt//20) == 0 and P.user_out):
                 print('{:5.2f}%'.format((ti/P.Nt)*100))
 
-            calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi)
+            calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, sys.bands, Mpi)
 
             # Calculate the currents at the timestep ti
-            calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path, current_intra_path,
+            calculate_currents(Nk2_idx, ti, current_exact_path,
+                               polarization_inter_path, current_intra_path,
                                T, P)
 
             # Integrate one integration time step
             if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-                if P.solver_method in ('bdf', 'adams'):
+                if P.solver_method in ('bdf', 'adams', 'rk4'):
+                    solver = cast(ode, solver)
                     solver.integrate(solver.t + P.dt)
                     solver_successful = solver.successful()
 
-                elif P.solver_method == 'rk4':
-                    T.solution_y_vec = rk_integrate(T.t[ti], T.solution_y_vec, path, sys,
-                                                    y0, P.dk, P.dt, rhs_ode)
-
-            elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
-                T.solution_y_vec[:-1], T.time_integral = von_neumann_series(T.t[ti], T.A_field[ti], T.E_field[ti], path, sys, y0[:-1], T.time_integral, P, ti)
+            elif P.dm_dynamics_method in ('series_expansion'):
+                T.solution_y_vec[:-1], T.time_integral =\
+                    von_neumann_series(T.t[ti], T.A_field[ti], T.E_field[ti],
+                                       path, sys, y0[:-1], T.time_integral, P, ti)
 
             # Increment time counter
             ti += 1
@@ -232,8 +264,8 @@ def run_sbe(sys, P, Mpi):
     P.run_time = end_time - start_time
 
     # calculate and write solutions
-    update_currents_with_kweight(T, P)
-    calculate_fourier(T, P, W)
+    update_currents_with_kweight(T, P, sys.bands)
+    calculate_fourier(T, P, W, sys.bands)
     write_current_emission_mpi(T, P, W, sys, Mpi)
 
     # Save the parameters of the calculation
@@ -262,31 +294,37 @@ def run_sbe(sys, P, Mpi):
                  t_pdf_densmat=T.t_pdf_densmat, A_field=T.A_field)
 
 
-def make_BZ(P):
+def make_BZ(
+    P
+):
         # Form Brillouin Zone
     if P.BZ_type == 'hexagon':
         if P.align == 'K':
             P.E_dir = np.array([1, 0], P.type_real_np)
         elif P.align == 'M':
             P.E_dir = np.array([np.cos(np.radians(-30)),
-                                np.sin(np.radians(-30))], dtype=P.type_real_np)
+                                np.sin(np.radians(-30))],
+                                dtype=P.type_real_np)
         P.dk, P.kweight, P.paths, P.mesh = hex_mesh(P)
 
     elif P.BZ_type == 'rectangle':
         P.E_dir = np.array([np.cos(np.radians(P.angle_inc_E_field)),
-                            np.sin(np.radians(P.angle_inc_E_field))], dtype=P.type_real_np)
+                            np.sin(np.radians(P.angle_inc_E_field))],
+                            dtype=P.type_real_np)
         P.dk, P.kweight, P.paths, P.mesh = rect_mesh(P)
 
     P.E_ort = np.array([P.E_dir[1], -P.E_dir[0]])
 
     if P.parallelize_over_points:
         if P.gauge != 'velocity':
-            system.exit('Parallelization over points can only be used with the velocity gauge')
+            exit('Parallelization over points can only be used with the velocity gauge')
         Nk1_buf = np.copy(P.Nk1)
         Nk2_buf = np.copy(P.Nk2)
+        Nk1_buf = cast(int, Nk1_buf)
+        Nk2_buf = cast(int, Nk2_buf)
         paths_buf = np.copy(P.paths)
 
-        P.paths = np.empty((Nk1_buf*Nk2_buf, 1, 2))
+        P.paths = np.empty((Nk1_buf*Nk2_buf, 1, 2), dtype=P.type_real_np)
         for i in range(Nk2_buf):
             for j in range(Nk1_buf):
                 P.paths[Nk1_buf*i + j, 0, 0] = paths_buf[i, j, 0]
@@ -294,51 +332,45 @@ def make_BZ(P):
         P.Nk1 = 1
         P.Nk2 = Nk1_buf * Nk2_buf
 
-def make_rhs_ode(P, T, sys):
-
-    if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-        if P.solver == '2band':
-            if P.bands != 2:
-                raise AttributeError('2-band solver works for 2-band systems only')
-            else:
-                rhs_ode = make_rhs_ode_2_band(sys, T.electric_field, P)
-        else:
-            rhs_ode = 0
-
-        if P.solver_method in ('bdf', 'adams'):
-            solver = ode(rhs_ode, jac=None).set_integrator('zvode', method=P.solver_method, max_step=P.dt)
-        else:
-            solver = 0
-
-    else:
-        rhs_ode = 0
-        solver = 0
-
-    return rhs_ode, solver
 
 
-def prepare_current_calculations(path, Nk2_idx, P, sys):
+def prepare_current_calculations(
+    path,
+    P,
+    sys
+) -> Tuple[Callable, Optional[Callable], Optional[Callable]]:
 
+    current_exact_path = None
     polarization_inter_path = None
     current_intra_path = None
     if P.gauge == 'length':
         current_exact_path = make_current_exact_path_length(path, P, sys)
-    if P.gauge == 'velocity':
+    elif P.gauge == 'velocity':
         current_exact_path = make_current_exact_path_velocity(path, P, sys)
     if P.split_current:
         polarization_inter_path = make_polarization_path(path, P, sys)
         current_intra_path = make_current_path(path, P, sys)
+    current_exact_path = cast(Callable, current_exact_path)
+
     return current_exact_path, polarization_inter_path, current_intra_path
 
 
-def calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi):
+def calculate_solution_at_timestep(
+    solver,
+    Nk2_idx,
+    ti,
+    T,
+    P,
+    bands,
+    Mpi 
+):
 
     is_first_Nk2_idx = (Mpi.local_Nk2_idx_list[0] == Nk2_idx)
 
     if P.dm_dynamics_method in ('sbe', 'semiclassics'):
-        if P.solver_method in ('bdf', 'adams'):
+        if P.solver_method in ('bdf', 'adams', 'rk4'):
             # Do not append the last element (A_field)
-            T.solution = solver.y[:-1].reshape(P.Nk1, P.bands, P.bands)
+            T.solution = solver.y[:-1].reshape(P.Nk1, bands, bands)
 
             # Construct time array only once
             if is_first_Nk2_idx:
@@ -347,21 +379,10 @@ def calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi):
                 T.A_field[ti] = solver.y[-1].real
                 T.E_field[ti] = T.electric_field(T.t[ti])
 
-        elif P.solver_method == 'rk4':
-            # Do not append the last element (A_field)
-            T.solution = T.solution_y_vec[:-1].reshape(P.Nk1, P.bands, P.bands)
-
-            # Construct time array only once
-            if is_first_Nk2_idx:
-                # Construct time and A_field only in first round
-                T.t[ti] = ti*P.dt + P.t0
-                T.A_field[ti] = T.solution_y_vec[-1].real
-                T.E_field[ti] = T.electric_field(T.t[ti])
-
-    elif P.dm_dynamics_method in ('series_expansion', 'EEA'):
+    elif P.dm_dynamics_method in ('series_expansion'):
 
         # Do not append the last element (A_field)
-        T.solution = T.solution_y_vec[:-1].reshape(P.Nk1, P.bands, P.bands)
+        T.solution = T.solution_y_vec[:-1].reshape(P.Nk1, bands, bands)
 
         # Construct time array only once
         if is_first_Nk2_idx:
@@ -379,7 +400,12 @@ def calculate_solution_at_timestep(solver, Nk2_idx, ti, T, P, Mpi):
         store_density_matrix_for_pdf(T, P, Nk2_idx, ti)
 
 
-def store_density_matrix_for_pdf(T, P, Nk2_idx, ti):
+def store_density_matrix_for_pdf(
+    T,
+    P,
+    Nk2_idx,
+    ti
+):
 
     for count, t_pdf_densmat in enumerate(P.t_pdf_densmat):
         if (t_pdf_densmat > T.t[ti-1] and t_pdf_densmat < T.t[ti]) or t_pdf_densmat == T.t[ti]:
@@ -387,26 +413,37 @@ def store_density_matrix_for_pdf(T, P, Nk2_idx, ti):
             T.t_pdf_densmat[count] = T.t[ti]
 
 
-def calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path, current_intra_path,
-                       T, P):
+def calculate_currents(
+    Nk2_idx,
+    ti,
+    current_exact_path,
+    polarization_inter_path,
+    current_intra_path,
+    T,
+    P
+):
 
     if (P.save_full == True and P.gauge == 'length'):
         # j_k_E_dir_path & j_k_ortho_path are containers for the full k-grid current
         # if save_full is True, i.e. all densities and the full k-grid current should
         # be written to disk
-        j_E_dir_buf, j_ortho_buf = current_exact_path(T.solution, T.E_field[ti], T.A_field[ti],
-                                                      T.j_k_E_dir_path, T.j_k_ortho_path)
+        j_E_dir_buf, j_ortho_buf =\
+            current_exact_path(T.solution, T.E_field[ti], T.A_field[ti],
+                               T.j_k_E_dir_path, T.j_k_ortho_path)
         T.j_k_E_dir[:, Nk2_idx, ti] = T.j_k_E_dir_path
         T.j_k_ortho[:, Nk2_idx, ti] = T.j_k_ortho_path
     else:
-        j_E_dir_buf, j_ortho_buf = current_exact_path(T.solution, T.E_field[ti], T.A_field[ti])
+        j_E_dir_buf, j_ortho_buf =\
+            current_exact_path(T.solution, T.E_field[ti], T.A_field[ti])
 
     T.j_E_dir[ti] += j_E_dir_buf
     T.j_ortho[ti] += j_ortho_buf
 
     if P.split_current:
-        P_E_dir_buf, P_ortho_buf = polarization_inter_path(T.solution, T.E_field[ti], T.A_field[ti])
-        j_intra_E_dir_buf, j_intra_ortho_buf, j_anom_ortho_buf = current_intra_path(T.solution, T.E_field[ti], T.A_field[ti])
+        P_E_dir_buf, P_ortho_buf =\
+            polarization_inter_path(T.solution, T.E_field[ti], T.A_field[ti])
+        j_intra_E_dir_buf, j_intra_ortho_buf, j_anom_ortho_buf =\
+            current_intra_path(T.solution, T.E_field[ti], T.A_field[ti])
 
         T.P_E_dir[ti] += P_E_dir_buf
         T.P_ortho[ti] += P_ortho_buf
@@ -414,16 +451,6 @@ def calculate_currents(Nk2_idx, ti, current_exact_path, polarization_inter_path,
         T.j_intra_ortho[ti] += j_intra_ortho_buf
         T.j_anom_ortho[ti, :] += j_anom_ortho_buf
 
-def rk_integrate(t, y, kpath, sys, y0, dk, dt, rhs_ode):
-
-    k1 = rhs_ode(t,          y,          kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k2 = rhs_ode(t + 0.5*dt, y + 0.5*k1, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k3 = rhs_ode(t + 0.5*dt, y + 0.5*k2, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-    k4 = rhs_ode(t +     dt, y +     k3, kpath, sys.dipole_in_path, sys.e_in_path, y0, dk)
-
-    ynew = y + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
-
-    return ynew
 
 @njit
 def y0deriv(y, dk, Nk_path, n, dk_order, type_complex_np):
@@ -482,48 +509,60 @@ def y0deriv(y, dk, Nk_path, n, dk_order, type_complex_np):
 
     return diffy0
 
-def von_neumann_series(t, A_field, E_field, path, sys, y0, time_integral, P, ti):
+def von_neumann_series(
+    t,
+    A_field,
+    E_field,
+    path,
+    sys,
+    y0,
+    time_integral,
+    P,
+    ti
+):
 
     # rescale solution vector and initial condition to be a matrix
-    y_mat = np.zeros((P.Nk1, P.bands, P.bands), dtype=P.type_complex_np)
-    y0_mat = y0.reshape(P.Nk1, P.bands, P.bands)
+    y_mat = np.zeros((P.Nk1, sys.bands, sys.bands), dtype=P.type_complex_np)
+    y0_mat = y0.reshape(P.Nk1, sys.bands, sys.bands)
 
     # 0th order
     y_mat[:, :, :] = np.copy(y0_mat[:, :, :])
 
-    if P.dm_dynamics_method == 'EEA':       # Approximate formula for DC remnants (Int(E^2*A), needs velocity gauge to make sense for finite times!)
+    # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
+    path_after_shift = np.copy(path)
 
-        if P.first_order:
-            y_mat = first_order_taylor(y_mat, y0_mat, t, E_field, A_field, sys.dipole_in_path, sys.e_in_path, \
-                                       sys.dipole_derivative_in_path, sys.bandstructure_derivative_in_path, P.T2, P.bands)
-        if P.second_order:
-            y_mat, time_integral = second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, \
-                                                       sys.dipole_in_path, sys.dipole_derivative_in_path, P.T2, P.dt, P.bands, P.Nk1)
+    H = SystemContainers()
 
-    elif P.dm_dynamics_method == 'series_expansion':
-        # calculate eigenvalues and dipole elements at current time step (velocity gauge!)
-        path_after_shift = np.copy(path)
+    path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
+    path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
 
-        if not P.gauge == 'length' or not P.linear_response:
-            path_after_shift[:, 0] = path[:, 0] + A_field*P.E_dir[0]
-            path_after_shift[:, 1] = path[:, 1] + A_field*P.E_dir[1]
+    H.energies = sys.evaluate_energy(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_real_np)
+    H.Ax, H.Ay = sys.evaluate_dipole(kx=path_after_shift[:, 0], ky=path_after_shift[:, 1], dtype=P.type_complex_np)
+    H.A_E_dir = H.Ax * P.E_dir[0] + H.Ay * P.E_dir[1]
 
-            sys.eigensystem_dipole_path(path_after_shift, P)
+    if P.gauge == 'length' :
+        if ti == 0:
+            P.diffy0 = y0deriv(y0_mat, P.dk, P.Nk1, sys.bands, P.dk_order, P.type_complex_np)
 
-        if P.gauge == 'length' :
-            if ti == 0:
-                P.diffy0 = y0deriv(y0_mat, P.dk, P.Nk1, P.bands, P.dk_order, P.type_complex_np)
+    if P.first_order:
+        if P.high_damping:
+            y_mat =\
+                first_order_high_damping(y_mat, y0_mat, t, E_field,
+                                         H.energies, H.A_E_dir,
+                                         P.T2, sys.bands)
+        else:
+            y_mat, time_integral =\
+                first_order(y_mat, time_integral, y0_mat, t, E_field,
+                            A_field, H.energies, H.A_E_dir,
+                            P.T2, P.dt, sys.bands, P.gauge, P.diffy0)
+    if P.second_order:
+        if P.high_damping:
+            y_mat, time_integral =\
+                second_order_high_damping(y_mat, time_integral, y0_mat, E_field,
+                                          H.A_E_dir, P.T2, P.dt, sys.bands, P.Nk1)
+        else:
+            print('Warning: second order without high damping not implemented yet!')
 
-        if P.first_order:
-            if P.high_damping:
-                y_mat = first_order_high_damping(y_mat, y0_mat, t, E_field, sys.e_in_path, sys.dipole_in_path, P.T2, P.bands)
-            else:
-                y_mat, time_integral = first_order(y_mat, time_integral, y0_mat, t, E_field, A_field, sys.e_in_path, sys.dipole_in_path, P.T2, P.dt, P.bands, P.gauge, P.diffy0)
-        if P.second_order:
-            if P.high_damping:
-                y_mat, time_integral = second_order(y_mat, time_integral, y0_mat, E_field, sys.dipole_in_path, P.T2, P.dt, P.bands, P.Nk1)
-            else:
-                print('Warning: second order without high damping not implemented yet!')
     return y_mat.flatten('C'), time_integral
 
 
@@ -597,22 +636,36 @@ def second_order_taylor(y_mat, time_integral, y0_mat, E_field, A_field, dipole_i
 
     return y_mat, time_integral
 
-def initial_condition(P, e_in_path):
+def initial_condition(
+    energies: np.ndarray,
+    e_fermi: float,
+    temperature: float,
+    dtype: type
+) -> np.ndarray:
     '''
     Occupy conduction band according to inital Fermi energy and temperature
+    If length gauge calculate distribution, if velocity gauge leave empty.
     '''
-    num_kpoints = e_in_path[:, 0].size
-    num_bands = e_in_path[0, :].size
-    distrib_bands = np.zeros([num_kpoints, num_bands], dtype=P.type_complex_np)
-    initial_condition = np.zeros([num_kpoints, num_bands, num_bands], dtype=P.type_complex_np)
-    if P.temperature > 1e-5:
-        distrib_bands += 1/(np.exp((e_in_path-P.e_fermi)/P.temperature) + 1)
+    num_kpoints = energies.shape[0]
+    num_bands = energies.shape[1]
+
+
+    distrib_bands = np.zeros([num_kpoints, num_bands], dtype=dtype)
+    initial_condition = np.zeros([num_kpoints, num_bands, num_bands],
+                                 dtype=dtype)
+    # if P.gauge == 'length':
+    if temperature > 1e-5:
+        distrib_bands += 1/(np.exp((energies - e_fermi)/temperature) + 1)
     else:
-        smaller_e_fermi = (P.e_fermi - e_in_path) > 0
+        smaller_e_fermi = (e_fermi - energies) > 0
         distrib_bands[smaller_e_fermi] += 1
 
     for k in range(num_kpoints):
         initial_condition[k, :, :] = np.diag(distrib_bands[k, :])
+    #elif P.gauge == 'velocity':
+    #    # Keep initial condition empty as container
+    #    # In the velocity gauge it needs to be calculated for every k-shift
+    #    pass
     return initial_condition.flatten('C')
 
 
@@ -692,7 +745,7 @@ def mpi_sum_currents(T, P, Mpi):
     if P.save_latex_pdf or P.save_dm_t:
         T.pdf_densmat   = Mpi.sync_and_sum(T.pdf_densmat)
 
-def update_currents_with_kweight(T, P):
+def update_currents_with_kweight(T, P, bands):
 
     T.j_E_dir *= P.kweight
     T.j_ortho *= P.kweight
@@ -717,11 +770,11 @@ def update_currents_with_kweight(T, P):
         T.j_intra_plus_dtP_ortho = T.j_intra_ortho + T.dtP_ortho
 
         T.j_intra_plus_anom_ortho = T.j_intra_ortho
-        for i in range(P.bands):
+        for i in range(bands):
             T.j_anom_ortho_full += T.j_anom_ortho[:, i]
             T.j_intra_plus_anom_ortho += T.j_anom_ortho[:, i]
 
-def calculate_fourier(T, P, W):
+def calculate_fourier(T, P, W, bands):
 
     # Fourier transforms
     # 1/(3c^3) in atomic units
@@ -738,57 +791,57 @@ def calculate_fourier(T, P, W):
         T.window_function = parzen(T.t)
 
     W.I_E_dir, W.j_E_dir =\
-        fourier_current_intensity(T.j_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
     W.I_ortho, W.j_ortho =\
-        fourier_current_intensity(T.j_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
     # always compute the Fourier transform with hann and parzen window for comparison; this is printed to the latex PDF
     W.I_E_dir_hann, W.j_E_dir_hann =\
-        fourier_current_intensity(T.j_E_dir, hann(T.t), dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_E_dir, hann(T.t), dt_out, prefac_emission, W.freq, P, bands)
     W.I_ortho_hann, W.j_ortho_hann =\
-        fourier_current_intensity(T.j_ortho, hann(T.t), dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_ortho, hann(T.t), dt_out, prefac_emission, W.freq, P, bands)
 
     W.I_E_dir_parzen, W.j_E_dir_parzen =\
-        fourier_current_intensity(T.j_E_dir, parzen(T.t), dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_E_dir, parzen(T.t), dt_out, prefac_emission, W.freq, P, bands)
     W.I_ortho_parzen, W.j_ortho_parzen =\
-        fourier_current_intensity(T.j_ortho, parzen(T.t), dt_out, prefac_emission, W.freq, P)
+        fourier_current_intensity(T.j_ortho, parzen(T.t), dt_out, prefac_emission, W.freq, P, bands)
 
     if P.split_current:
         # Approximate current and emission intensity
         W.I_intra_plus_dtP_E_dir, W.j_intra_plus_dtP_E_dir =\
-            fourier_current_intensity(T.j_intra_plus_dtP_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_intra_plus_dtP_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_intra_plus_dtP_ortho, W.j_intra_plus_dtP_ortho =\
-            fourier_current_intensity(T.j_intra_plus_dtP_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_intra_plus_dtP_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
         # Intraband current and emission intensity
         W.I_intra_E_dir, W.j_intra_E_dir =\
-            fourier_current_intensity(T.j_intra_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_intra_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_intra_ortho, W.j_intra_ortho =\
-            fourier_current_intensity(T.j_intra_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_intra_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
         # Polarization-related current and emission intensity
         W.I_dtP_E_dir, W.dtP_E_dir =\
-            fourier_current_intensity(T.dtP_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.dtP_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_dtP_ortho, W.dtP_ortho =\
-            fourier_current_intensity(T.dtP_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.dtP_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
         # Dephasing current and emission intensity
         W.I_deph_E_dir, W.j_deph_E_dir =\
-            fourier_current_intensity(T.j_deph_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_deph_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_deph_ortho, W.j_deph_ortho =\
-            fourier_current_intensity(T.j_deph_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_deph_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
         # Anomalous current, intraband current (de/dk-related) + anomalous current; and emission int.
         W.I_anom_ortho, W.j_anom_ortho =\
-            fourier_current_intensity(T.j_anom_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_anom_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_anom_ortho_full, W.j_anom_ortho_full =\
-            fourier_current_intensity(T.j_anom_ortho_full, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_anom_ortho_full, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
         W.I_intra_plus_anom_ortho, W.j_intra_plus_anom_ortho =\
-            fourier_current_intensity(T.j_intra_plus_anom_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+            fourier_current_intensity(T.j_intra_plus_anom_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
 
     if P.gabor_transformation:
         if not(hasattr(P,"gabor_gaussian_center") and hasattr(P,"gabor_window_width")):
-            system.exit("Either no center(s) or width(s) were given for the invoked Gabor transformation.")
+            exit("Either no center(s) or width(s) were given for the invoked Gabor transformation.")
         W.I_E_dir_GT = []
         W.j_E_dir_GT = []
         W.I_ortho_GT = []
@@ -803,9 +856,9 @@ def calculate_fourier(T, P, W):
             for window in P.gabor_window_width:
                 T.window_function = gaussian(T.t, window,center)
                 I_E_dir, j_E_dir=\
-                    fourier_current_intensity(T.j_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P)
+                    fourier_current_intensity(T.j_E_dir, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
                 I_ortho, j_ortho =\
-                    fourier_current_intensity(T.j_ortho, T.window_function, dt_out, prefac_emission, W.freq, P)
+                    fourier_current_intensity(T.j_ortho, T.window_function, dt_out, prefac_emission, W.freq, P, bands)
                 W.I_E_dir_CT.append(I_E_dir)
                 W.j_E_dir_CT.append(j_E_dir)
                 W.I_ortho_CT.append(I_ortho)
@@ -815,6 +868,7 @@ def calculate_fourier(T, P, W):
             W.j_E_dir_GT.append(W.j_E_dir_CT)
             W.I_ortho_GT.append(W.I_ortho_CT)
             W.j_ortho_GT.append(W.j_ortho_CT)
+
 # def write_full_density_mpi(T, P, sys, Mpi):
 #     relative_dir = 'densities'
 #     if Mpi.rank == 0:
@@ -877,6 +931,7 @@ def write_screening_combinations(P, params):
     # Load a reference f/f0 into memory
     P.construct_current_parameters_and_filename(0)
     _t, freq_data, _d = read_dataset(path='.', prefix=P.filename_prefix)
+    freq_data = cast(np.ndarray, freq_data)
 
     # First E-dir, second ortho, third combined data
     S = np.empty(3, dtype=ScreeningContainers)
@@ -978,13 +1033,14 @@ def write_current_emission(T, P, W, sys, Mpi):
                     "j_intra_E_dir", "j_intra_ortho",
                     "dtP_E_dir", "dtP_ortho", "j_deph_E_dir", "j_deph_ortho",
                     "j_intra_plus_dtP_E_dir", "j_intra_plus_dtP_ortho")
-        time_output = np.column_stack([T.t.real,
-                                       T.j_E_dir.real, T.j_ortho.real,
-                                       T.j_intra_E_dir.real, T.j_intra_ortho.real,
-                                       T.dtP_E_dir.real, T.dtP_ortho.real, T.j_deph_E_dir.real, T.j_deph_ortho.real,
-                                       T.j_intra_plus_dtP_E_dir.real, T.j_intra_plus_dtP_ortho.real])
+        time_output =\
+            np.column_stack([T.t.real,
+                             T.j_E_dir.real, T.j_ortho.real,
+                             T.j_intra_E_dir.real, T.j_intra_ortho.real,
+                             T.dtP_E_dir.real, T.dtP_ortho.real, T.j_deph_E_dir.real, T.j_deph_ortho.real,
+                             T.j_intra_plus_dtP_E_dir.real, T.j_intra_plus_dtP_ortho.real])
         if P.save_anom:
-            for i in range(P.bands):
+            for i in range(sys.bands):
                 time_header += dat_header_format.format(f"j_anom_ortho[{i}]")
                 time_output = np.column_stack((time_output, T.j_anom_ortho[:, i].real))
             time_header += (dat_header_format*2).format("j_anom_ortho", "j_intra_plus_anom_ortho")
@@ -1000,7 +1056,10 @@ def write_current_emission(T, P, W, sys, Mpi):
     time_output[np.abs(time_output) <= 10e-100] = 0
     time_output[np.abs(time_output) >= 1e+100] = np.inf
 
-    np.savetxt(P.filename_prefix + 'time_data.dat', time_output, header=time_header, delimiter=dat_delimiter_format, fmt=dat_precision_format)
+    np.savetxt(P.filename_prefix + 'time_data.dat', time_output,
+               header=time_header,
+               delimiter=dat_delimiter_format,
+               fmt=dat_precision_format)
 
     ##################################################
     # Frequency data save
@@ -1033,7 +1092,7 @@ def write_current_emission(T, P, W, sys, Mpi):
                                        W.j_intra_plus_dtP_E_dir.real, W.j_intra_plus_dtP_E_dir.imag, W.j_intra_plus_dtP_ortho.real, W.j_intra_plus_dtP_ortho.imag,
                                        W.I_intra_plus_dtP_E_dir.real, W.I_intra_plus_dtP_ortho.real])
         if P.save_anom:
-            for i in range(P.bands):
+            for i in range(sys.bands):
                 freq_header += (dat_header_format*3).format(f"Re[j_anom_ortho[{i}]]", f"Im[j_anom_ortho[{i}]", \
                                             f"I_anom_ortho[{i}]")
                 freq_output = np.column_stack((freq_output, W.j_anom_ortho[:, i].real, W.j_anom_ortho[:, i].imag, W.I_anom_ortho[:, i].real) )
@@ -1078,7 +1137,11 @@ def write_current_emission(T, P, W, sys, Mpi):
         write_and_compile_latex_PDF(T, W, P, sys, Mpi)
 
 
-def write_efield_afield(T, P, W):
+def write_efield_afield(
+    T,
+    P,
+    W
+):
 
     time_header = ("{:25s}" + " {:27s}"*2).format("t", "E_field", "A_field")
     time_output = np.column_stack([T.t.real, T.E_field, T.A_field])
@@ -1102,12 +1165,22 @@ def write_efield_afield(T, P, W):
     np.savetxt(P.filename_prefix + 'fields_frequency_data.dat', freq_output, header=freq_header, delimiter=' '*3, fmt="%+.18e")
 
 
-def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq, P):
+def fourier_current_intensity(
+    jt,
+    window_function,
+    dt_out,
+    prefac_emission,
+    freq,
+    P,
+    bands
+) -> Tuple[np.ndarray, np.ndarray]:
 
     ndt_fft = freq.size
     ndt = np.size(jt, axis=0)
 
     jt_for_fft = np.zeros(ndt_fft, dtype=P.type_real_np)
+    jw = None
+    Iw = None
     if np.ndim(jt) == 1:
         jt_for_fft[(ndt_fft - ndt)//2:(ndt_fft + ndt)//2] = jt[:]*window_function[:]
         jw = fourier(dt_out, jt_for_fft)
@@ -1118,7 +1191,7 @@ def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq
         jw      = np.empty([ndt_fft, n], dtype=P.type_complex_np)
         Iw      = np.empty([ndt_fft, n], dtype=P.type_real_np)
 
-        for i in range(P.bands):
+        for i in range(bands):
             jt_for_fft[(ndt_fft - ndt)//2:(ndt_fft + ndt)//2] = jt[:, i]*window_function[:]
             jw[:, i] = fourier(dt_out, jt_for_fft)
             Iw[:, i] = prefac_emission*(freq**2)*np.abs(jw[:, i])**2
@@ -1133,11 +1206,21 @@ def fourier_current_intensity(jt, window_function, dt_out, prefac_emission, freq
                 jt_for_fft[(ndt_fft - ndt)//2:(ndt_fft + ndt)//2] = jt[:, i, j]*window_function[:]
                 jw[:, i, j] = fourier(dt_out, jt_for_fft)
                 Iw[:, i, j] = prefac_emission*(freq**2)*np.abs(jw[:, i, j])**2
+    else:
+        raise ValueError("jt has to be 1, 2 or 3 dimensional."
+                         "Something strange happenend.")
+    Iw = cast(np.ndarray, Iw)
+    jw = cast(np.ndarray, jw)
 
     return Iw, jw
 
 
-def print_user_info(P, B0=None, mu=None, incident_angle=None):
+def print_user_info(
+    P,
+    B0=None,
+    mu=None,
+    incident_angle=None
+):
     """
     Function that prints the input parameters if usr_info = True
     """
