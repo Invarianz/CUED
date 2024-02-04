@@ -59,10 +59,12 @@ class ParamsParser():
         # if single value and wrap in list
         global_array_set = {'gabor_gaussian_center', 'gabor_window_width',
                             't_pdf_densmat'}
-
-        if (type(param) == list or type(param) == np.ndarray) \
-            and not key in global_array_set:
-
+        if key in global_array_set:
+            if type(param) == np.ndarray:
+                param = param.tolist()
+            self.UP_params_lists.append([param])
+            self.UP_params_maximum.append(0)
+        elif (type(param) == list or type(param) == np.ndarray):
             if type(param) == np.ndarray:
                 param = param.tolist()
             if not type(param[0]) == str:
@@ -71,11 +73,6 @@ class ParamsParser():
                 self.UP_params_maximum.append(0)
             self.num_param_combinations *= np.size(param)
             self.UP_params_lists.append(param)
-        elif key in global_array_set:
-            if type(param) == np.ndarray:
-                param = param.tolist()
-            self.UP_params_lists.append([param])
-            self.UP_params_maximum.append(0)
         else:
             self.UP_params_lists.append([param])
             self.UP_params_maximum.append(0)

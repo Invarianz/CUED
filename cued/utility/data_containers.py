@@ -19,14 +19,14 @@ class SystemContainers():
         self.Bcurv: Optional[np.ndarray] = None
 
 class TimeContainers():
-    def __init__(self, P):
+    def __init__(self, P, bands):
         self.t = np.zeros(P.Nt, dtype=P.type_real_np)
         self.solution: Optional[np.ndarray] = None
         self.solution_y_vec: Optional[np.ndarray] = None
 
         if P.save_full:
             # Container for the full k-grid densities
-            self.solution_full = np.empty((P.Nk1, P.Nk2, P.Nt, P.bands, P.bands), dtype=P.type_complex_np)
+            self.solution_full = np.empty((P.Nk1, P.Nk2, P.Nt, bands, bands), dtype=P.type_complex_np)
             # Like the full solution this saves the full k-grid currents
             self.j_k_E_dir = np.empty((P.Nk1, P.Nk2, P.Nt), dtype=P.type_real_np)
             self.j_k_ortho = np.empty((P.Nk1, P.Nk2, P.Nt), dtype=P.type_real_np)
@@ -50,7 +50,7 @@ class TimeContainers():
             self.dtP_E_dir = np.zeros(P.Nt, dtype=P.type_real_np)
             self.dtP_ortho = np.zeros(P.Nt, dtype=P.type_real_np)
 
-            self.j_anom_ortho = np.zeros([P.Nt, P.bands], dtype=P.type_real_np)
+            self.j_anom_ortho = np.zeros([P.Nt, bands], dtype=P.type_real_np)
             self.j_anom_ortho_full = np.zeros(P.Nt, dtype=P.type_real_np)
 
         # Initialize electric_field, create rhs of ode and initialize solver
@@ -60,7 +60,7 @@ class TimeContainers():
             self.electric_field = make_electric_field(P)
 
         if P.save_latex_pdf or P.save_dm_t:
-            self.pdf_densmat = np.zeros((P.Nk1, P.Nk2, P.Nt_pdf_densmat, P.bands, P.bands), dtype=P.type_complex_np)
+            self.pdf_densmat = np.zeros((P.Nk1, P.Nk2, P.Nt_pdf_densmat, bands, bands), dtype=P.type_complex_np)
             self.t_pdf_densmat = np.zeros(P.Nt_pdf_densmat)
 
 class FrequencyContainers():

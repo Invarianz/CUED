@@ -524,7 +524,7 @@ def make_current_exact_path_length(path, P, sys):
 def make_current_exact_bandstructure_velocity(path, P, sys):
 
     Nk1 = P.Nk1
-    n = P.bands
+    n = sys.bands
     E_dir = P.E_dir
     E_ort = np.array([E_dir[1], -E_dir[0]])
 
@@ -595,7 +595,7 @@ def make_current_exact_bandstructure_velocity(path, P, sys):
 def make_current_exact_bandstructure(path, P, sys):
 
     Nk1 = P.Nk1
-    n = P.bands
+    n = sys.bands
 
     kx_in_path = path[:, 0]
     ky_in_path = path[:, 1]
@@ -633,7 +633,7 @@ def make_intraband_current_bandstructure_velocity(path, P, sys):
     """
 
     Nk1 = P.Nk1
-    n = P.bands
+    n = sys.bands
     save_anom = P.save_anom
     E_dir = P.E_dir
     E_ort = np.array([E_dir[1], -E_dir[0]])
@@ -696,16 +696,16 @@ def make_intraband_current_bandstructure(path, P, sys):
     """
 
     Nk1 = P.Nk1
-    n = P.bands
+    n = sys.bands
     save_anom = P.save_anom
 
     kx_in_path = path[:, 0]
     ky_in_path = path[:, 1]
 
-    ederivx = np.zeros([P.Nk1, P.bands], dtype=P.type_real_np)
-    ederivy = np.zeros([P.Nk1, P.bands], dtype=P.type_real_np)
+    ederivx = np.zeros([P.Nk1, sys.bands], dtype=P.type_real_np)
+    ederivy = np.zeros([P.Nk1, sys.bands], dtype=P.type_real_np)
 
-    for i in range(P.bands):
+    for i in range(sys.bands):
         ederivx[:, i] = sys.dkxejit[i](kx=kx_in_path, ky=ky_in_path)
         ederivy[:, i] = sys.dkyejit[i](kx=kx_in_path, ky=ky_in_path)
 
@@ -739,7 +739,7 @@ def make_polarization_inter_bandstructure_velocity(path, P, sys):
     dipole_ortho = sys.dipole_ortho
 
     Nk1 = P.Nk1
-    n = P.bands
+    n = sys.bands
     save_anom = P.save_anom
     E_dir = P.E_dir
     E_ort = np.array([E_dir[1], -E_dir[0]])
@@ -802,7 +802,7 @@ def make_polarization_inter_bandstructure(P, sys):
     """
     dipole_in_path = sys.dipole_in_path
     dipole_ortho = sys.dipole_ortho
-    n = P.bands
+    n = sys.bands
     Nk1 = P.Nk1
     type_complex_np = P.type_complex_np
 
