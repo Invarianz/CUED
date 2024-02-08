@@ -1,8 +1,11 @@
 import numpy as np
+from numpy.typing import NDArray
 import sympy as sp
 
 from numba import njit
 from sympy.utilities.lambdify import lambdify
+
+from typing import List, Callable
 
 class conditional_njit():
     """
@@ -17,36 +20,39 @@ class conditional_njit():
             return func
         return njit(func, **self.kwargs)
 
-def matrix_to_njit_functions(
+def matrix_to_functions(
     sf: sp.Matrix,
     hsymbols,
-    dtype: type = np.cdouble
+    dtype: type = np.cdouble,
+    nojit: bool = False
 ):
     """
     Converts a sympy matrix into a matrix of functions
     """
     shp = sf.shape
-    jitmat = [[to_njit_function(sf[j, i], hsymbols, dtype)
+    jitmat = [[to_function(sf[j, i], hsymbols, dtype=dtype, nojit=nojit)
                for i in range(shp[0])] for j in range(shp[1])]
     return jitmat
 
 
-def list_to_njit_functions(
+def list_to_functions(
     sf,
     hsymbols,
-    dtype: type = np.cdouble
+    dtype: type = np.cdouble,
+    nojit: bool = False
 ):
     """
     Converts a list of sympy functions/matrices to a list of numpy
     callable functions/matrices
     """
-    return [to_njit_function(sfn, hsymbols, dtype) for sfn in sf]
+    return [to_function(sfn, hsymbols, dtype=dtype, nojit=nojit) for sfn in sf]
 
 
-def to_njit_function(
+def to_function(
     sf,
     hsymbols,
-    dtype: type = np.cdouble
+    dtype: type = np.cdouble,
+    nojit: bool = False
 ):
     """
     Converts a simple sympy function to a function callable by numpy
@@ -54,57 +60,61 @@ def to_njit_function(
     # Standard k variables
     kx, ky = sp.symbols('kx ky', real=True)
 
-    return __to_njit_function_k(sf, hsymbols, kx, ky, dtype=dtype)
+    return __to_function_k(sf, hsymbols, kx, ky, dtype=dtype, nojit=nojit)
 
 
-def __to_njit_function_k(
+def __to_function_k(
     sf,
     hsymbols,
     kx: sp.Symbol,
     ky: sp.Symbol,
-    dtype: type = np.cdouble
+    dtype: type = np.cdouble,
+    nojit: bool = False
 ):
     kset = {kx, ky}
     # Check wheter k is contained in the free symbols
     contains_k = bool(sf.free_symbols.intersection(kset))
     if contains_k:
         # All free Hamiltonian symbols get function parameters
-        if dtype == np.clongdouble:
+        if dtype == np.longdouble or dtype == np.clongdouble or nojit:
+            print("HELLO IM HERE")
             return lambdify(list(hsymbols), sf, np)
         return njit(lambdify(list(hsymbols), sf, np))
     # Here we have missing kx, or ky in sf. Expand sf by 0*kx*ky
     sf = sf + sp.Mul(kx, ky, sp.UnevaluatedExpr(0))
-    if dtype == np.longcomplex:
+    if dtype == np.longdouble or dtype == np.clongdouble or nojit:
         return lambdify(list(hsymbols), sf, np)
     return njit(lambdify(list(hsymbols), sf, np))
 
-def evaluate_njit_list(
-    ljit, 
+def evaluate_function_list(
+    function_list: List[Callable], 
     kx: np.ndarray = np.empty(1),
     ky: np.ndarray = np.empty(1),
     dtype: type = np.cdouble,
     **fkwargs
-):
-    n = len(ljit)
+) -> NDArray[type]:
+
+    n = len(function_list)
     numpy_arr = np.empty((np.size(kx), n), dtype=dtype)
 
     for i in range(n):
-        numpy_arr[:, i] = ljit[i](kx=kx, ky=ky, **fkwargs)
+        numpy_arr[:, i] = function_list[i](kx=kx, ky=ky, **fkwargs)
 
     return numpy_arr
 
-def evaluate_njit_matrix(
-    mjit, 
+def evaluate_function_matrix(
+    function_matrix: List[List[Callable]], 
     kx: np.ndarray = np.empty(1),
     ky: np.ndarray = np.empty(1),
     dtype: type = np.cdouble,
     **fkwargs
-):
-    shp = np.shape(mjit)
+) -> NDArray[type]:
+
+    shp = np.shape(function_matrix)
     numpy_matrix = np.empty((np.size(kx),) + shp, dtype=dtype)
 
     for r in range(shp[0]):
         for c in range(shp[1]):
-            numpy_matrix[:, r, c] = mjit[r][c](kx=kx, ky=ky, **fkwargs)
+            numpy_matrix[:, r, c] = function_matrix[r][c](kx=kx, ky=ky, **fkwargs)
 
     return numpy_matrix

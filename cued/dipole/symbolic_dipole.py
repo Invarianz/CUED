@@ -1,7 +1,7 @@
 import sympy as sp
 import numpy as np
 import matplotlib.pyplot as plt
-from cued.utility.njit import evaluate_njit_matrix, matrix_to_njit_functions
+from cued.utility.njit import evaluate_function_matrix, matrix_to_functions
 
 plt.rcParams['figure.figsize'] = [150, 15]
 plt.rcParams['text.usetex'] = True
@@ -55,8 +55,8 @@ class SymbolicDipole():
             self.Ax, self.Ay = self.__kdotp_fields(kdotp, e[0], e[1])
 
         # Njit function and function arguments
-        self.Axfjit = matrix_to_njit_functions(self.Ax, self.hsymbols)
-        self.Ayfjit = matrix_to_njit_functions(self.Ay, self.hsymbols)
+        self.Axfjit = matrix_to_functions(self.Ax, self.hsymbols)
+        self.Ayfjit = matrix_to_functions(self.Ay, self.hsymbols)
 
         # Evaluated fields
         self.Ax_eval = None
@@ -97,8 +97,8 @@ class SymbolicDipole():
             keyword arguments passed to the symbolic expression
         """
         # Evaluate all kpoints without BZ
-        self.Ax_eval = evaluate_njit_matrix(self.Axfjit, kx, ky, **fkwargs)
-        self.Ay_eval = evaluate_njit_matrix(self.Ayfjit, kx, ky, **fkwargs)
+        self.Ax_eval = evaluate_function_matrix(self.Axfjit, kx, ky, **fkwargs)
+        self.Ay_eval = evaluate_function_matrix(self.Ayfjit, kx, ky, **fkwargs)
         return self.Ax_eval, self.Ay_eval
 
     def offdiagonal_k(self, wf):
@@ -108,9 +108,9 @@ class SymbolicDipole():
         Ukp_h = wf[1].subs(self.kx, kxp).subs(self.ky, kyp)
         self.Ax_offk, self.Ay_offk = self.__fields(wf[0], Ukp_h)
 
-        self.Axfjit_offk = matrix_to_njit_functions(self.Ax_offk,
+        self.Axfjit_offk = matrix_to_functions(self.Ax_offk,
                                                     self.hsymbols, kpflag=True)
-        self.Ayfjit_offk = matrix_to_njit_functions(self.Ay_offk,
+        self.Ayfjit_offk = matrix_to_functions(self.Ay_offk,
                                                     self.hsymbols, kpflag=True)
 
     def plot_dipoles(self, kx, ky, vidx=0, cidx=1,

@@ -2,7 +2,7 @@ import numpy as np
 import sympy as sp
 import matplotlib.pyplot as plt
 
-from cued.utility import evaluate_njit_matrix, matrix_to_njit_functions
+from cued.utility import evaluate_function_matrix, matrix_to_functions
 
 plt.rcParams['figure.figsize'] = [12, 15]
 plt.rcParams['text.usetex'] = True
@@ -31,14 +31,14 @@ class SymbolicCurvature():
         self.B = sp.diff(Ax, self.ky) - sp.diff(Ay, self.kx)
 
         hsymbols = h.free_symbols
-        self.Bfjit = matrix_to_njit_functions(self.B, hsymbols)
+        self.Bfjit = matrix_to_functions(self.B, hsymbols)
 
         self.B_eval = None
 
     def evaluate(self, kx, ky, **fkwargs):
         # Evaluate all kpoints without BZ
 
-        self.B_eval = evaluate_njit_matrix(self.Bfjit, kx, ky, **fkwargs)
+        self.B_eval = evaluate_function_matrix(self.Bfjit, kx, ky, **fkwargs)
 
         return self.B_eval
 

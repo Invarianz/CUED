@@ -3,8 +3,8 @@ import sympy as sp
 
 from typing import cast, List, Optional, Tuple, Union
 
-from cued.utility.njit import (list_to_njit_functions, matrix_to_njit_functions,
-                               evaluate_njit_list, evaluate_njit_matrix)
+from cued.utility.njit import (list_to_functions, matrix_to_functions,
+                               evaluate_function_list, evaluate_function_matrix)
 
 class TwoBandHamiltonianSystem():
     so = sp.Matrix([[1, 0], [0, 1]])
@@ -206,11 +206,14 @@ class TwoBandHamiltonianSystem():
 
     def make_eigensystem_jit(
         self,
-        dtype: type = np.cdouble
+        dtype: type = np.cdouble,
+        nojit: bool = False
     ):
         """
         Create callable compiled ("jit'ed") functions for all symbols i.e.
-        Hamiltonian, Energies, Energy derivatives, Berry Connection & Curvature
+        Hamiltonian, Energies, Energy derivatives, Berry Connection & Curvature.
+        If nojit is True don't jit the resulting functions.
+        This means the function calls are slower but compilation time is saved.
         """
         if not self.__eigensystem_called:
             # If this is called we can assume the following symbols to be set
@@ -223,9 +226,9 @@ class TwoBandHamiltonianSystem():
         self.hderiv = cast(List[sp.Matrix], self.hderiv)
         # Jitted Hamiltonian and Hamiltonian derivatives
         self.h_jit =\
-            matrix_to_njit_functions(self.h, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.h, self.h.free_symbols, dtype=dtype, nojit=nojit)
         self.hderiv_jit =\
-            [matrix_to_njit_functions(hd, self.h.free_symbols, dtype=dtype)
+            [matrix_to_functions(hd, self.h.free_symbols, dtype=dtype, nojit=nojit)
              for hd in self.hderiv]
 
         # Assume Symbols since eigensystem was called
@@ -233,33 +236,33 @@ class TwoBandHamiltonianSystem():
         self.ederiv = cast(List[sp.Symbol], self.ederiv)
         # Jitted Energies and Energy derivatives
         self.e_jit =\
-            list_to_njit_functions(self.e, self.h.free_symbols, dtype=dtype)
+            list_to_functions(self.e, self.h.free_symbols, dtype=dtype, nojit=nojit)
         self.ederiv_jit =\
-            list_to_njit_functions(self.ederiv, self.h.free_symbols, dtype=dtype)
+            list_to_functions(self.ederiv, self.h.free_symbols, dtype=dtype, nojit=nojit)
 
         # Assume Matrix since eigensystem was called
         self.U = cast(sp.Matrix, self.U)
         self.U_h = cast(sp.Matrix, self.U_h)
         # Jitted Wave functions and Wave function derivatives
         self.U_jit =\
-            matrix_to_njit_functions(self.U, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.U, self.h.free_symbols, dtype=dtype, nojit=nojit)
         self.U_h_jit =\
-            matrix_to_njit_functions(self.U_h, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.U_h, self.h.free_symbols, dtype=dtype, nojit=nojit)
 
         # Assume Matrix since eigensystem was called
         self.Ax = cast(sp.Matrix, self.Ax)
         self.Ay = cast(sp.Matrix, self.Ay)
         # Jitted Berry Connection
         self.Ax_jit =\
-            matrix_to_njit_functions(self.Ax, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.Ax, self.h.free_symbols, dtype=dtype, nojit=nojit)
         self.Ay_jit =\
-            matrix_to_njit_functions(self.Ay, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.Ay, self.h.free_symbols, dtype=dtype, nojit=nojit)
 
         # Assume Matrix since eigensystem was called
         self.B = cast(sp.Matrix, self.B)
         # Jitted Berry Curvature
         self.B_jit =\
-            matrix_to_njit_functions(self.B, self.h.free_symbols, dtype=dtype)
+            matrix_to_functions(self.B, self.h.free_symbols, dtype=dtype, nojit=nojit)
 
     def evaluate_energy(
         self,
@@ -271,7 +274,7 @@ class TwoBandHamiltonianSystem():
         '''
         Evaluate energy bands at all give k-points
         '''
-        return evaluate_njit_list(self.e_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
+        return evaluate_function_list(self.e_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
 
     def evaluate_ederivative(
         self,
@@ -280,7 +283,7 @@ class TwoBandHamiltonianSystem():
         dtype=np.double,
         **fkwargs
     ) -> np.ndarray:
-        return evaluate_njit_list(self.ederiv_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
+        return evaluate_function_list(self.ederiv_jit, kx=kx, ky=ky, dtype=dtype, **fkwargs)
 
     def evaluate_wavefunction(
         self,
@@ -290,8 +293,8 @@ class TwoBandHamiltonianSystem():
         **fkwargs
     ) -> Tuple[np.ndarray, np.ndarray]:
 
-        U_eval = evaluate_njit_matrix(self.U_jit, kx, ky, dtype=dtype, **fkwargs)
-        U_h_eval = evaluate_njit_matrix(self.U_h_jit, kx, ky, dtype=dtype, **fkwargs)
+        U_eval = evaluate_function_matrix(self.U_jit, kx, ky, dtype=dtype, **fkwargs)
+        U_h_eval = evaluate_function_matrix(self.U_h_jit, kx, ky, dtype=dtype, **fkwargs)
         return U_eval, U_h_eval
 
     def evaluate_dipole(
@@ -302,8 +305,8 @@ class TwoBandHamiltonianSystem():
         **fkwargs
     ) -> Tuple[np.ndarray, np.ndarray]:
         # Evaluate all kpoints without BZ
-        Ax_eval = evaluate_njit_matrix(self.Ax_jit, kx, ky, dtype=dtype, **fkwargs)
-        Ay_eval = evaluate_njit_matrix(self.Ay_jit, kx, ky, dtype=dtype, **fkwargs)
+        Ax_eval = evaluate_function_matrix(self.Ax_jit, kx, ky, dtype=dtype, **fkwargs)
+        Ay_eval = evaluate_function_matrix(self.Ay_jit, kx, ky, dtype=dtype, **fkwargs)
         return Ax_eval, Ay_eval
 
     def evaluate_curvature(
@@ -314,4 +317,4 @@ class TwoBandHamiltonianSystem():
         **fkwargs
     ) -> np.ndarray:
         # Evaluate all kpoints without BZ
-        return evaluate_njit_matrix(self.B_jit, kx, ky, dtype=dtype, **fkwargs)
+        return evaluate_function_matrix(self.B_jit, kx, ky, dtype=dtype, **fkwargs)

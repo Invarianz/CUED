@@ -2,7 +2,7 @@ import numpy as np
 
 from typing import cast
 
-from cued.utility.njit import conditional_njit, evaluate_njit_matrix
+from cued.utility.njit import conditional_njit, evaluate_function_matrix
 
 ########################################
 # Observables for the 2-band code
@@ -392,16 +392,16 @@ def make_current_exact_path_length(path, P, sys):
     ky_in_path = path[:, 1]
     pathlen = kx_in_path.size
 
-    h_deriv_x = evaluate_njit_matrix(sys.hderiv_jit[0], kx=kx_in_path, ky=ky_in_path,
+    h_deriv_x = evaluate_function_matrix(sys.hderiv_jit[0], kx=kx_in_path, ky=ky_in_path,
                                      dtype=P.type_complex_np)
-    h_deriv_y = evaluate_njit_matrix(sys.hderiv_jit[1], kx=kx_in_path, ky=ky_in_path,
+    h_deriv_y = evaluate_function_matrix(sys.hderiv_jit[1], kx=kx_in_path, ky=ky_in_path,
                                      dtype=P.type_complex_np)
 
     h_deriv_E_dir= h_deriv_x*E_dir[0] + h_deriv_y*E_dir[1]
     h_deriv_ortho = h_deriv_x*E_ort[0] + h_deriv_y*E_ort[1]
 
-    U = evaluate_njit_matrix(sys.U_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-    U_h = evaluate_njit_matrix(sys.U_h_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    U = evaluate_function_matrix(sys.U_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    U_h = evaluate_function_matrix(sys.U_h_jit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
     if P.dm_dynamics_method == 'semiclassics':
         Bcurv = np.empty((pathlen, 2), dtype=P.type_complex_np)
@@ -545,8 +545,8 @@ def make_current_exact_bandstructure_velocity(path, P, sys):
 
     type_complex_np = P.type_complex_np
 
-    # mel_x = evaluate_njit_matrix(sys.melxjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-    # mel_y = evaluate_njit_matrix(sys.melyjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    # mel_x = evaluate_function_matrix(sys.melxjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    # mel_y = evaluate_function_matrix(sys.melyjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
     # mel_in_path = P.E_dir[0]*mel_x + P.E_dir[1]*mel_y
     # mel_ortho = P.E_ort[0]*mel_x + P.E_ort[1]*mel_y
@@ -600,8 +600,8 @@ def make_current_exact_bandstructure(path, P, sys):
     kx_in_path = path[:, 0]
     ky_in_path = path[:, 1]
 
-    mel_x = evaluate_njit_matrix(sys.melxjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
-    mel_y = evaluate_njit_matrix(sys.melyjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    mel_x = evaluate_function_matrix(sys.melxjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
+    mel_y = evaluate_function_matrix(sys.melyjit, kx=kx_in_path, ky=ky_in_path, dtype=P.type_complex_np)
 
     mel_in_path = P.E_dir[0]*mel_x + P.E_dir[1]*mel_y
     mel_ortho = P.E_ort[0]*mel_x + P.E_ort[1]*mel_y 
