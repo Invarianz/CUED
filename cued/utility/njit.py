@@ -77,7 +77,6 @@ def __to_function_k(
     if contains_k:
         # All free Hamiltonian symbols get function parameters
         if dtype == np.longdouble or dtype == np.clongdouble or nojit:
-            print("HELLO IM HERE")
             return lambdify(list(hsymbols), sf, np)
         return njit(lambdify(list(hsymbols), sf, np))
     # Here we have missing kx, or ky in sf. Expand sf by 0*kx*ky
