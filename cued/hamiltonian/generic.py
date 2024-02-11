@@ -201,7 +201,7 @@ class TwoBandHamiltonianSystem():
         self.Ay = -sp.I * self.U_h * sp.diff(self.U, self.ky)
 
         # Create Berry curvature
-        self.B = sp.Add(sp.diff(self.Ax, self.ky), -sp.diff(self.Ay, self.kx))
+        self.B = sp.Add(sp.diff(self.Ay, self.kx), -sp.diff(self.Ax, self.ky))
         self.__eigensystem_called = True
 
     def make_eigensystem_jit(

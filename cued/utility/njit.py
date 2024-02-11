@@ -77,13 +77,13 @@ def __to_function_k(
     if contains_k:
         # All free Hamiltonian symbols get function parameters
         if dtype == np.longdouble or dtype == np.clongdouble or nojit:
-            return lambdify(list(hsymbols), sf, np)
-        return njit(lambdify(list(hsymbols), sf, np))
+            return lambdify(list(hsymbols), sf, "numpy")
+        return njit(lambdify(list(hsymbols), sf, "numpy"))
     # Here we have missing kx, or ky in sf. Expand sf by 0*kx*ky
     sf = sf + sp.Mul(kx, ky, sp.UnevaluatedExpr(0))
     if dtype == np.longdouble or dtype == np.clongdouble or nojit:
-        return lambdify(list(hsymbols), sf, np)
-    return njit(lambdify(list(hsymbols), sf, np))
+        return lambdify(list(hsymbols), sf, "numpy")
+    return njit(lambdify(list(hsymbols), sf, "numpy"))
 
 def evaluate_function_list(
     function_list: List[Callable], 
