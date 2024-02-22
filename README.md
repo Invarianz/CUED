@@ -1,3 +1,5 @@
+<h1>All development on GitHub for this Fork has stopped. I'm hosting all developments on sourcehut instead. See <a href="https://git.sr.ht/~invarianz/cued"> CUED repo</a></h1>
+
 # <img alt="CUED" src="/cued/branding/logo_inverted.png#gh-dark-mode-only" height="100">
 # <img alt="CUED" src="/cued/branding/logo.png#gh-light-mode-only" height="100">
 
